@@ -31,4 +31,4 @@ comfy-table = "6.2.0"
 serde_repr = "0.1.12"
 
 [features]
-default = ["boa_engine/intl", "boa_engine/annex-b"]
+default = ["boa_engine/intl", "boa_engine/annex-b", "boa_engine/temporal"]

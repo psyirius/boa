@@ -70,6 +70,7 @@ use crate::{
     native_function::NativeFunction,
     object::{ConstructorBuilder, JsFunction, JsObject, NativeObject, ObjectData, PROTOTYPE},
     property::{Attribute, PropertyDescriptor, PropertyKey},
+    realm::Realm,
     Context, JsResult, JsValue,
 };
 
@@ -86,7 +87,7 @@ pub trait Class: NativeObject + Sized {
     fn constructor(this: &JsValue, args: &[JsValue], context: &mut Context<'_>) -> JsResult<Self>;
 
     /// Initializes the internals and the methods of the class.
-    fn init(class: &mut ClassBuilder<'_, '_>) -> JsResult<()>;
+    fn init(class: &mut ClassBuilder) -> JsResult<()>;
 }
 
 /// This is a wrapper around `Class::constructor` that sets the internal data of a class.
@@ -162,17 +163,17 @@ impl<T: Class> ClassConstructor for T {
 
 /// Class builder which allows adding methods and static methods to the class.
 #[derive(Debug)]
-pub struct ClassBuilder<'ctx, 'host> {
-    builder: ConstructorBuilder<'ctx, 'host>,
+pub struct ClassBuilder {
+    builder: ConstructorBuilder,
 }
 
-impl<'ctx, 'host> ClassBuilder<'ctx, 'host> {
-    pub(crate) fn new<T>(context: &'ctx mut Context<'host>) -> Self
+impl ClassBuilder {
+    pub(crate) fn new<T>(realm: Realm) -> Self
     where
         T: ClassConstructor,
     {
         let mut builder =
-            ConstructorBuilder::new(context, NativeFunction::from_fn_ptr(T::raw_constructor));
+            ConstructorBuilder::new(realm, NativeFunction::from_fn_ptr(T::raw_constructor));
         builder.name(T::NAME);
         builder.length(T::LENGTH);
         Self { builder }
@@ -293,7 +294,7 @@ impl<'ctx, 'host> ClassBuilder<'ctx, 'host> {
 
     /// Return the current context.
     #[inline]
-    pub fn context(&mut self) -> &mut Context<'host> {
-        self.builder.context()
+    pub const fn realm(&self) -> &Realm {
+        self.builder.realm()
     }
 }

@@ -89,6 +89,8 @@ pub mod operations;
 pub mod pattern;
 pub mod property;
 pub mod statement;
+#[cfg(feature = "temporal")]
+pub mod temporal;
 pub mod visitor;
 
 use boa_interner::{Interner, ToIndentedString, ToInternedString};
@@ -104,6 +106,8 @@ pub use self::{
     statement::Statement,
     statement_list::{StatementList, StatementListItem},
 };
+#[cfg(feature = "temporal")]
+pub use temporal::UtcOffset;
 
 /// Utility to join multiple Nodes into a single string.
 fn join_nodes<N>(interner: &Interner, nodes: &[N]) -> String

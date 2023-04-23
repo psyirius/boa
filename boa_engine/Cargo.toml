@@ -35,6 +35,7 @@ intl = [
 ]
 
 fuzz = ["boa_ast/arbitrary", "boa_interner/arbitrary"]
+temporal = ["boa_parser/temporal"]
 
 # Enable Boa's VM instruction flowgraph generator.
 flowgraph = []
@@ -81,7 +82,7 @@ icu_normalizer = "1.2.0"
 # intl deps
 icu_locid_transform = { version = "1.2.1", features = ["std", "serde"], optional = true }
 icu_locid = { version = "1.2.0", features = ["serde"], optional = true }
-icu_datetime = { version = "1.2.0", features = ["serde", "experimental"], optional = true }
+icu_datetime = { version = "1.2.1", features = ["serde", "experimental"], optional = true }
 icu_calendar = { version = "1.2.0", optional = true }
 icu_collator = { version = "1.2.0", features = ["serde"], optional = true }
 icu_plurals = { version = "1.2.0", features = ["serde"], optional = true }

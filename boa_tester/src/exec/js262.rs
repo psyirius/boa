@@ -9,7 +9,7 @@ use boa_engine::{
 pub(super) fn register_js262(context: &mut Context<'_>) -> JsObject {
     let global_obj = context.global_object();
 
-    let js262 = ObjectInitializer::new(context)
+    let js262 = ObjectInitializer::new(context.realm().clone())
         .function(NativeFunction::from_fn_ptr(create_realm), "createRealm", 0)
         .function(
             NativeFunction::from_fn_ptr(detach_array_buffer),

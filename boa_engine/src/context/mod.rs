@@ -69,7 +69,7 @@ use crate::vm::RuntimeLimits;
 /// context.eval(Source::from_bytes(script)).unwrap();
 ///
 /// // Create an object that can be used in eval calls.
-/// let arg = ObjectInitializer::new(&mut context)
+/// let arg = ObjectInitializer::new(context.realm().clone())
 ///     .property("x", 12, Attribute::READONLY)
 ///     .build();
 /// context.register_global_property("arg", arg, Attribute::all());
@@ -208,7 +208,7 @@ impl<'host> Context<'host> {
     ///     .register_global_property("myPrimitiveProperty", 10, Attribute::all())
     ///     .expect("property shouldn't exist");
     ///
-    /// let object = ObjectInitializer::new(&mut context)
+    /// let object = ObjectInitializer::new(context.realm().clone())
     ///     .property("x", 0, Attribute::all())
     ///     .property("y", 1, Attribute::all())
     ///     .build();
@@ -256,7 +256,7 @@ impl<'host> Context<'host> {
         length: usize,
         body: NativeFunction,
     ) -> JsResult<()> {
-        let function = FunctionObjectBuilder::new(self, body)
+        let function = FunctionObjectBuilder::new(self.realm.clone(), body)
             .name(name)
             .length(length)
             .constructor(true)
@@ -289,7 +289,7 @@ impl<'host> Context<'host> {
         length: usize,
         body: NativeFunction,
     ) -> JsResult<()> {
-        let function = FunctionObjectBuilder::new(self, body)
+        let function = FunctionObjectBuilder::new(self.realm.clone(), body)
             .name(name)
             .length(length)
             .constructor(false)
@@ -326,7 +326,7 @@ impl<'host> Context<'host> {
     where
         T: Class,
     {
-        let mut class_builder = ClassBuilder::new::<T>(self);
+        let mut class_builder = ClassBuilder::new::<T>(self.realm.clone());
         T::init(&mut class_builder)?;
 
         let class = class_builder.build();

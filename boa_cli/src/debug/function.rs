@@ -175,7 +175,7 @@ fn traceable(_: &JsValue, args: &[JsValue], _: &mut Context<'_>) -> JsResult<JsV
 }
 
 pub(super) fn create_object(context: &mut Context<'_>) -> JsObject {
-    ObjectInitializer::new(context)
+    ObjectInitializer::new(context.realm().clone())
         .function(NativeFunction::from_fn_ptr(flowgraph), "flowgraph", 1)
         .function(NativeFunction::from_fn_ptr(bytecode), "bytecode", 1)
         .function(NativeFunction::from_fn_ptr(trace), "trace", 1)

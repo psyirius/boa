@@ -49,7 +49,7 @@ use boa_gc::{Finalize, Trace};
 ///     .then(
 ///         Some(
 ///             FunctionObjectBuilder::new(
-///                 context,
+///                 context.realm().clone(),
 ///                 NativeFunction::from_fn_ptr(|_, args, _| {
 ///                     Err(JsError::from_opaque(args.get_or_undefined(0).clone()).into())
 ///                 }),
@@ -61,7 +61,7 @@ use boa_gc::{Finalize, Trace};
 ///     )?
 ///     .catch(
 ///         FunctionObjectBuilder::new(
-///             context,
+///             context.realm().clone(),
 ///             NativeFunction::from_fn_ptr(|_, args, _| {
 ///                 Ok(args.get_or_undefined(0).clone())
 ///             }),
@@ -71,7 +71,7 @@ use boa_gc::{Finalize, Trace};
 ///     )?
 ///     .finally(
 ///         FunctionObjectBuilder::new(
-///             context,
+///             context.realm().clone(),
 ///             NativeFunction::from_fn_ptr(|_, _, context| {
 ///                 context
 ///                     .global_object()
@@ -405,7 +405,7 @@ impl JsPromise {
     /// )?.then(
     ///     Some(
     ///         FunctionObjectBuilder::new(
-    ///             context,
+    ///             context.realm().clone(),
     ///             NativeFunction::from_fn_ptr(|_, args, context| {
     ///                 args.get_or_undefined(0).to_string(context).map(JsValue::from)
     ///             }),
@@ -471,7 +471,7 @@ impl JsPromise {
     ///     context,
     /// )?.catch(
     ///     FunctionObjectBuilder::new(
-    ///         context,
+    ///         context.realm().clone(),
     ///         NativeFunction::from_fn_ptr(|_, args, context| {
     ///             args.get_or_undefined(0).to_string(context).map(JsValue::from)
     ///         }),
@@ -535,7 +535,7 @@ impl JsPromise {
     ///     context,
     /// )?.finally(
     ///     FunctionObjectBuilder::new(
-    ///         context,
+    ///         context.realm().clone(),
     ///         NativeFunction::from_fn_ptr(|_, _, context| {
     ///             context
     ///                 .global_object()
