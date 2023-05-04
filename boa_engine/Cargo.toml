@@ -63,7 +63,7 @@ num-bigint = { version = "0.4.3", features = ["serde"] }
 num-integer = "0.1.45"
 bitflags = "2.3.1"
 indexmap = "1.9.3"
-ryu-js = "0.2.2"
+ryu-js = { git = "https://github.com/boa-dev/ryu-js.git", branch = "feature/to-fixed" }
 chrono = { version = "0.4.26", default-features = false, features = ["clock", "std"] }
 fast-float = "0.2.0"
 once_cell = "1.18.0"
