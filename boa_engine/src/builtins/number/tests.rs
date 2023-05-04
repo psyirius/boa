@@ -479,3 +479,12 @@ fn issue_2717() {
         TestAction::assert_eq("(0.23046743672210102).toString(36)", "0.8aoosla2phj"),
     ]);
 }
+
+// https://github.com/boa-dev/boa/issues/2609
+#[test]
+fn issue_2609() {
+    run_test_actions([
+        TestAction::assert_eq("(1.25).toFixed(1)", "1.3"),
+        TestAction::assert_eq("(1.35).toFixed(1)", "1.4"),
+    ]);
+}
