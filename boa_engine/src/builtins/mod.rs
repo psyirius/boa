@@ -273,6 +273,13 @@ impl Realm {
             intl::segmenter::Segments::init(self);
             intl::segmenter::SegmentIterator::init(self);
         }
+
+        #[cfg(feature = "temporal")]
+        {
+            temporal::TimeZone::init(self);
+            temporal::Temporal::init(self);
+            temporal::Instant::init(self);
+        }
     }
 }
 
@@ -373,7 +380,10 @@ pub(crate) fn set_default_global_bindings(context: &mut Context<'_>) -> JsResult
     global_binding::<intl::Intl>(context)?;
 
     #[cfg(feature = "temporal")]
-    global_binding::<temporal::Temporal>(context)?;
+    {
+        global_binding::<temporal::Temporal>(context)?;
+        global_binding::<temporal::TimeZone>(context)?;
+    }
 
     Ok(())
 }

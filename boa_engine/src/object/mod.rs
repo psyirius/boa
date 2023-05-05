@@ -1824,6 +1824,16 @@ impl Object {
         }
     }
 
+    /// Gets the `TimeZone` data if the object is a `TimeZone`.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn as_time_zone(&self) -> Option<&TimeZone> {
+        match self.kind {
+            ObjectKind::TimeZone(ref it) => Some(it),
+            _ => None,
+        }
+    }
+
     /// Return `true` if it is a native object and the native type is `T`.
     pub fn is<T>(&self) -> bool
     where
