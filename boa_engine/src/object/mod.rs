@@ -53,7 +53,7 @@ use crate::{
         set::ordered_set::OrderedSet,
         set::SetIterator,
         string::StringIterator,
-        temporal::TimeZone,
+        temporal::{Duration, Instant, TimeZone},
         typed_array::{integer_indexed_object::IntegerIndexed, TypedArrayKind},
         DataView, Date, Promise, RegExp,
     },
@@ -361,7 +361,7 @@ pub enum ObjectKind {
 
     /// The `Temporal.Instant` object kind.
     #[cfg(feature = "temporal")]
-    Instant,
+    Instant(Instant),
 
     /// The `Temporal.PlainDateTime` object kind.
     #[cfg(feature = "temporal")]
@@ -389,7 +389,7 @@ pub enum ObjectKind {
 
     /// The `Temporal.Duration` object kind.
     #[cfg(feature = "temporal")]
-    Duration,
+    Duration(Duration),
 }
 
 unsafe impl Trace for ObjectKind {
@@ -441,7 +441,7 @@ unsafe impl Trace for ObjectKind {
             | Self::Number(_)
             | Self::Symbol(_) => {}
             #[cfg(feature = "temporal")]
-            Self::Instant | Self::PlainDateTime | Self::PlainDate | Self::PlainTime | Self::PlainYearMonth | Self::PlainMonthDay | Self::TimeZone(_) | Self::Duration => {}
+            Self::Instant(_) | Self::PlainDateTime | Self::PlainDate | Self::PlainTime | Self::PlainYearMonth | Self::PlainMonthDay | Self::TimeZone(_) | Self::Duration(_) => {}
         }
     }}
 }
@@ -831,9 +831,9 @@ impl ObjectData {
     /// Create the `Segments` object data
     #[cfg(feature = "intl")]
     #[must_use]
-    pub fn segments(segments: Segments) -> Self {
+    pub fn instant() -> Self {
         Self {
-            kind: ObjectKind::Segments(segments),
+            kind: ObjectKind::Instant,
             internal_methods: &ORDINARY_INTERNAL_METHODS,
         }
     }
@@ -851,9 +851,9 @@ impl ObjectData {
     /// Create the `Instant` object data
     #[cfg(feature = "temporal")]
     #[must_use]
-    pub fn instant() -> Self {
+    pub fn instant(instant: Instant) -> Self {
         Self {
-            kind: ObjectKind::Instant,
+            kind: ObjectKind::Instant(instant),
             internal_methods: &ORDINARY_INTERNAL_METHODS,
         }
     }
@@ -919,9 +919,9 @@ impl ObjectData {
     /// Create the `Duration` object data
     #[cfg(feature = "temporal")]
     #[must_use]
-    pub fn duration() -> Self {
+    pub fn duration(duration: Duration) -> Self {
         Self {
-            kind: ObjectKind::Duration,
+            kind: ObjectKind::Duration(duration),
             internal_methods: &ORDINARY_INTERNAL_METHODS,
         }
     }
@@ -982,7 +982,7 @@ impl Debug for ObjectKind {
             #[cfg(feature = "intl")]
             Self::SegmentIterator(_) => "SegmentIterator",
             #[cfg(feature = "temporal")]
-            Self::Instant => "Instant",
+            Self::Instant(_) => "Instant",
             #[cfg(feature = "temporal")]
             Self::PlainDateTime => "PlainDateTime",
             #[cfg(feature = "temporal")]
@@ -996,7 +996,7 @@ impl Debug for ObjectKind {
             #[cfg(feature = "temporal")]
             Self::TimeZone(_) => "TimeZone",
             #[cfg(feature = "temporal")]
-            Self::Duration => "Duration",
+            Self::Duration(_) => "Duration",
         })
     }
 }
@@ -1824,12 +1824,59 @@ impl Object {
         }
     }
 
-    /// Gets the `TimeZone` data if the object is a `TimeZone`.
+    /// Gets the `TimeZone` data if the object is a `Temporal.TimeZone`.
     #[inline]
     #[cfg(feature = "temporal")]
     pub fn as_time_zone(&self) -> Option<&TimeZone> {
         match self.kind {
-            ObjectKind::TimeZone(ref it) => Some(it),
+            ObjectKind::TimeZone(ref tz) => Some(tz),
+            _ => None,
+        }
+    }
+
+    /// Gets a mutable reference to `Instant` data if the object is a `Temporal.Instant`.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn as_instant_mut(&mut self) -> Option<&mut Instant> {
+        match &mut self.kind {
+            ObjectKind::Instant(instant) => Some(instant),
+            _ => None,
+        }
+    }
+
+    /// Gets the `Instant` data if the object is a `Temporal.Instant`.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn as_instant(&self) -> Option<&Instant> {
+        match &self.kind {
+            ObjectKind::Instant(instant) => Some(instant),
+            _ => None,
+        }
+    }
+
+    /// Checks if the object is a `Duration` object.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn is_duration(&self) -> bool {
+        matches!(self.kind, ObjectKind::Duration(_))
+    }
+
+    /// Gets a mutable reference to `Duration` data if the object is a `Temporal.Duration`.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn as_duration_mut(&mut self) -> Option<&mut Duration> {
+        match &mut self.kind {
+            ObjectKind::Duration(dur) => Some(dur),
+            _ => None,
+        }
+    }
+
+    /// Gets the `Duration` data if the object is a `Temporal.Duration`.
+    #[inline]
+    #[cfg(feature = "temporal")]
+    pub fn as_duration(&self) -> Option<&Duration> {
+        match &self.kind {
+            ObjectKind::Duration(dur) => Some(dur),
             _ => None,
         }
     }
