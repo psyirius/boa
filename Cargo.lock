@@ -3537,7 +3537,7 @@ checksum = "f91339c0467de62360649f8d3e185ca8de4224ff281f66000de5eb2a77a79041"
 [[package]]
 name = "ryu-js"
 version = "0.2.2"
-source = "git+https://github.com/boa-dev/ryu-js.git?branch=feature/to-fixed#570d2502dcbbba9230fad3f90730f366cca90395"
+source = "git+https://github.com/boa-dev/ryu-js.git?branch=feature/to-fixed#ec1044b3d5d973b614a05db30835280d06b00a85"
 
 [[package]]
 name = "same-file"
