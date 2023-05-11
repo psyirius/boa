@@ -2,7 +2,7 @@ use crate::{
     builtins::{function::FunctionKind, promise::PromiseCapability, Promise},
     error::JsNativeError,
     module::{ModuleKind, Referrer},
-    object::FunctionObjectBuilder,
+    object::{internal_methods::InternalMethodContext, FunctionObjectBuilder},
     vm::{opcode::Operation, CompletionType},
     Context, JsResult, JsValue, NativeFunction,
 };
@@ -68,7 +68,8 @@ impl Operation for CallEval {
                 context.vm.push(JsValue::Undefined);
             }
         } else {
-            let result = object.__call__(&this, &arguments, context)?;
+            let result =
+                object.__call__(&this, &arguments, &mut InternalMethodContext::new(context))?;
             context.vm.push(result);
         }
         Ok(CompletionType::Normal)
@@ -142,7 +143,8 @@ impl Operation for CallEvalSpread {
                 context.vm.push(JsValue::Undefined);
             }
         } else {
-            let result = object.__call__(&this, &arguments, context)?;
+            let result =
+                object.__call__(&this, &arguments, &mut InternalMethodContext::new(context))?;
             context.vm.push(result);
         }
         Ok(CompletionType::Normal)
@@ -193,7 +195,8 @@ impl Operation for Call {
             }
         };
 
-        let result = object.__call__(&this, &arguments, context)?;
+        let result =
+            object.__call__(&this, &arguments, &mut InternalMethodContext::new(context))?;
 
         context.vm.push(result);
         Ok(CompletionType::Normal)
@@ -246,7 +249,8 @@ impl Operation for CallSpread {
             }
         };
 
-        let result = object.__call__(&this, &arguments, context)?;
+        let result =
+            object.__call__(&this, &arguments, &mut InternalMethodContext::new(context))?;
 
         context.vm.push(result);
         Ok(CompletionType::Normal)

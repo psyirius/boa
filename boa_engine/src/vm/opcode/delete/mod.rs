@@ -1,5 +1,6 @@
 use crate::{
     error::JsNativeError,
+    object::internal_methods::InternalMethodContext,
     vm::{opcode::Operation, CompletionType},
     Context, JsResult,
 };
@@ -22,8 +23,9 @@ impl Operation for DeletePropertyByName {
         let key = context.vm.frame().code_block.names[index as usize]
             .clone()
             .into();
-        let result = object.__delete__(&key, context)?;
-        if !result && context.vm.frame().code_block.strict() {
+
+        let result = object.__delete__(&key, &mut InternalMethodContext::new(context))?;
+        if !result && context.vm.frame().code_block().strict() {
             return Err(JsNativeError::typ()
                 .with_message("Cannot delete property")
                 .into());
@@ -49,8 +51,9 @@ impl Operation for DeletePropertyByValue {
         let value = context.vm.pop();
         let object = value.to_object(context)?;
         let property_key = key_value.to_property_key(context)?;
-        let result = object.__delete__(&property_key, context)?;
-        if !result && context.vm.frame().code_block.strict() {
+
+        let result = object.__delete__(&property_key, &mut InternalMethodContext::new(context))?;
+        if !result && context.vm.frame().code_block().strict() {
             return Err(JsNativeError::typ()
                 .with_message("Cannot delete property")
                 .into());

@@ -727,7 +727,7 @@ generate_impl! {
         ///
         /// Like `object.name`
         ///
-        /// Operands: name_index: `u32`
+        /// Operands: ic_index: `u32`
         ///
         /// Stack: object, receiver **=>** value
         GetPropertyByName,
@@ -762,7 +762,7 @@ generate_impl! {
         ///
         /// Like `object.name = value`
         ///
-        /// Operands: name_index: `u32`
+        /// Operands: ic_index: `u32`
         ///
         /// Stack: object, receiver, value **=>** value
         SetPropertyByName,

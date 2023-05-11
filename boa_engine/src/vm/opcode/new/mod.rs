@@ -1,5 +1,6 @@
 use crate::{
     error::JsNativeError,
+    object::internal_methods::InternalMethodContext,
     vm::{opcode::Operation, CompletionType},
     Context, JsResult,
 };
@@ -44,7 +45,9 @@ impl Operation for New {
                     .with_message("not a constructor")
                     .into()
             })
-            .and_then(|cons| cons.__construct__(&arguments, cons, context))?;
+            .and_then(|cons| {
+                cons.__construct__(&arguments, cons, &mut InternalMethodContext::new(context))
+            })?;
 
         context.vm.push(result);
         Ok(CompletionType::Normal)
@@ -97,7 +100,9 @@ impl Operation for NewSpread {
                     .with_message("not a constructor")
                     .into()
             })
-            .and_then(|cons| cons.__construct__(&arguments, cons, context))?;
+            .and_then(|cons| {
+                cons.__construct__(&arguments, cons, &mut InternalMethodContext::new(context))
+            })?;
 
         context.vm.push(result);
         Ok(CompletionType::Normal)

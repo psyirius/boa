@@ -3,7 +3,9 @@
 //! The `JsObject` is a garbage collected Object.
 
 use super::{
-    internal_methods::{InternalObjectMethods, ARRAY_EXOTIC_INTERNAL_METHODS},
+    internal_methods::{
+        InternalMethodContext, InternalObjectMethods, ARRAY_EXOTIC_INTERNAL_METHODS,
+    },
     shape::RootShape,
     JsPrototype, NativeObject, Object, PrivateName, PropertyMap,
 };
@@ -819,6 +821,8 @@ Cannot both specify accessors and a value or writable attribute",
     where
         K: Into<PropertyKey>,
     {
+        let context = &mut InternalMethodContext::new(context);
+
         // 1. Assert: Type(target) is Object.
         // 2. Assert: excludedItems is a List of property keys.
         // 3. If source is undefined or null, return target.

@@ -34,7 +34,11 @@ mod runtime_limits;
 pub mod flowgraph;
 
 pub use runtime_limits::RuntimeLimits;
-pub use {call_frame::CallFrame, code_block::CodeBlock, opcode::Opcode};
+pub use {
+    call_frame::CallFrame,
+    code_block::{CodeBlock, InlineCache},
+    opcode::Opcode,
+};
 
 pub(crate) use {
     call_frame::GeneratorResumeKind,
@@ -164,7 +168,7 @@ impl Context<'_> {
             let frame = self.vm.frame_mut();
 
             let pc = frame.pc;
-            let opcode = Opcode::from(frame.code_block.bytecode[pc as usize]);
+            let opcode = Opcode::from(frame.code_block.bytecode[pc as usize].get());
             frame.pc += 1;
             opcode
         };

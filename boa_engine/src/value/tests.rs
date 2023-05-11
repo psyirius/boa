@@ -2,6 +2,7 @@ use boa_macros::utf16;
 use indoc::indoc;
 
 use super::*;
+use crate::object::internal_methods::InternalMethodContext;
 use crate::{run_test_actions, TestAction};
 
 use std::collections::hash_map::DefaultHasher;
@@ -197,10 +198,13 @@ fn float_display() {
 
 #[test]
 fn string_length_is_not_enumerable() {
-    run_test_actions([TestAction::assert_context(|ctx| {
-        let object = JsValue::new("foo").to_object(ctx).unwrap();
+    run_test_actions([TestAction::assert_context(|context| {
+        let object = JsValue::new("foo").to_object(context).unwrap();
         let length_desc = object
-            .__get_own_property__(&PropertyKey::from("length"), ctx)
+            .__get_own_property__(
+                &PropertyKey::from("length"),
+                &mut InternalMethodContext::new(context),
+            )
             .unwrap()
             .unwrap();
         !length_desc.expect_enumerable()
@@ -209,16 +213,20 @@ fn string_length_is_not_enumerable() {
 
 #[test]
 fn string_length_is_in_utf16_codeunits() {
-    run_test_actions([TestAction::assert_context(|ctx| {
+    run_test_actions([TestAction::assert_context(|context| {
         // 😀 is one Unicode code point, but 2 UTF-16 code units
-        let object = JsValue::new("😀").to_object(ctx).unwrap();
+        let object = JsValue::new("😀").to_object(context).unwrap();
+
         let length_desc = object
-            .__get_own_property__(&PropertyKey::from("length"), ctx)
+            .__get_own_property__(
+                &PropertyKey::from("length"),
+                &mut InternalMethodContext::new(context),
+            )
             .unwrap()
             .unwrap();
         length_desc
             .expect_value()
-            .to_integer_or_infinity(ctx)
+            .to_integer_or_infinity(context)
             .unwrap()
             == IntegerOrInfinity::Integer(2)
     })]);

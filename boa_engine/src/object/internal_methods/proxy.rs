@@ -1,13 +1,15 @@
 use crate::{
     builtins::{array, object::Object},
     error::JsNativeError,
-    object::{InternalObjectMethods, JsObject, JsPrototype},
+    object::{shape::slot::SlotAttributes, InternalObjectMethods, JsObject, JsPrototype},
     property::{PropertyDescriptor, PropertyKey},
     string::utf16,
     value::Type,
-    Context, JsResult, JsValue,
+    JsResult, JsValue,
 };
 use rustc_hash::FxHashSet;
+
+use super::InternalMethodContext;
 
 /// Definitions of the internal object methods for array exotic objects.
 ///
@@ -53,7 +55,7 @@ pub(crate) static PROXY_EXOTIC_INTERNAL_METHODS_ALL: InternalObjectMethods =
 /// [spec]: https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getprototypeof
 pub(crate) fn proxy_exotic_get_prototype_of(
     obj: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsPrototype> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -115,7 +117,7 @@ pub(crate) fn proxy_exotic_get_prototype_of(
 pub(crate) fn proxy_exotic_set_prototype_of(
     obj: &JsObject,
     val: JsPrototype,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -178,7 +180,7 @@ pub(crate) fn proxy_exotic_set_prototype_of(
 /// [spec]: https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-isextensible
 pub(crate) fn proxy_exotic_is_extensible(
     obj: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -224,7 +226,7 @@ pub(crate) fn proxy_exotic_is_extensible(
 /// [spec]: https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-preventextensions
 pub(crate) fn proxy_exotic_prevent_extensions(
     obj: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -270,8 +272,10 @@ pub(crate) fn proxy_exotic_prevent_extensions(
 pub(crate) fn proxy_exotic_get_own_property(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<Option<PropertyDescriptor>> {
+    context.slot().attributes |= SlotAttributes::NOT_CACHABLE;
+
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
     // 3. Assert: Type(handler) is Object.
@@ -286,6 +290,7 @@ pub(crate) fn proxy_exotic_get_own_property(
     let Some(trap) = handler.get_method(utf16!("getOwnPropertyDescriptor"), context)? else {
         // 6. If trap is undefined, then
         // a. Return ? target.[[GetOwnProperty]](P).
+
         return target.__get_own_property__(key, context);
     };
 
@@ -394,8 +399,10 @@ pub(crate) fn proxy_exotic_define_own_property(
     obj: &JsObject,
     key: &PropertyKey,
     desc: PropertyDescriptor,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
+    context.slot().attributes |= SlotAttributes::NOT_CACHABLE;
+
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
     // 3. Assert: Type(handler) is Object.
@@ -505,8 +512,10 @@ pub(crate) fn proxy_exotic_define_own_property(
 pub(crate) fn proxy_exotic_has_property(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
+    context.slot().attributes |= SlotAttributes::NOT_CACHABLE;
+
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
     // 3. Assert: Type(handler) is Object.
@@ -571,8 +580,11 @@ pub(crate) fn proxy_exotic_get(
     obj: &JsObject,
     key: &PropertyKey,
     receiver: JsValue,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsValue> {
+    // Proxy object can't be cached.
+    context.slot().attributes |= SlotAttributes::NOT_CACHABLE;
+
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
     // 3. Assert: Type(handler) is Object.
@@ -640,8 +652,10 @@ pub(crate) fn proxy_exotic_set(
     key: PropertyKey,
     value: JsValue,
     receiver: JsValue,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
+    context.slot().attributes |= SlotAttributes::NOT_CACHABLE;
+
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
     // 3. Assert: Type(handler) is Object.
@@ -721,7 +735,7 @@ pub(crate) fn proxy_exotic_set(
 pub(crate) fn proxy_exotic_delete(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -787,7 +801,7 @@ pub(crate) fn proxy_exotic_delete(
 /// [spec]: https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys
 pub(crate) fn proxy_exotic_own_property_keys(
     obj: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<Vec<PropertyKey>> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -923,7 +937,7 @@ fn proxy_exotic_call(
     obj: &JsObject,
     this: &JsValue,
     args: &[JsValue],
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsValue> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -948,7 +962,7 @@ fn proxy_exotic_call(
     // 8. Return ? Call(trap, handler, « target, thisArgument, argArray »).
     trap.call(
         &handler.into(),
-        &[target.clone().into(), this.clone(), arg_array.into()],
+        &[target.into(), this.clone(), arg_array.into()],
         context,
     )
 }
@@ -963,7 +977,7 @@ fn proxy_exotic_construct(
     obj: &JsObject,
     args: &[JsValue],
     new_target: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsObject> {
     // 1. Let handler be O.[[ProxyHandler]].
     // 2. If handler is null, throw a TypeError exception.
@@ -991,11 +1005,7 @@ fn proxy_exotic_construct(
     // 9. Let newObj be ? Call(trap, handler, « target, argArray, newTarget »).
     let new_obj = trap.call(
         &handler.into(),
-        &[
-            target.clone().into(),
-            arg_array.into(),
-            new_target.clone().into(),
-        ],
+        &[target.into(), arg_array.into(), new_target.clone().into()],
         context,
     )?;
 

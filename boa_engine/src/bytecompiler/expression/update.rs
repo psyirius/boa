@@ -61,20 +61,19 @@ impl ByteCompiler<'_, '_> {
             Access::Property { access } => match access {
                 PropertyAccess::Simple(access) => match access.field() {
                     PropertyAccessField::Const(name) => {
-                        let index = self.get_or_insert_name((*name).into());
                         self.compile_expr(access.target(), true);
                         self.emit_opcode(Opcode::Dup);
                         self.emit_opcode(Opcode::Dup);
                         self.emit_opcode(Opcode::Dup);
 
-                        self.emit(Opcode::GetPropertyByName, &[index]);
+                        self.emit_get_property_by_name(*name);
                         self.emit_opcode(opcode);
                         if post {
                             self.emit_opcode(Opcode::RotateRight);
                             self.emit_u8(4);
                         }
 
-                        self.emit(Opcode::SetPropertyByName, &[index]);
+                        self.emit_set_property_by_name(*name);
                         if post {
                             self.emit_opcode(Opcode::Pop);
                         }
@@ -118,21 +117,20 @@ impl ByteCompiler<'_, '_> {
                 }
                 PropertyAccess::Super(access) => match access.field() {
                     PropertyAccessField::Const(name) => {
-                        let index = self.get_or_insert_name((*name).into());
                         self.emit_opcode(Opcode::Super);
                         self.emit_opcode(Opcode::Dup);
                         self.emit_opcode(Opcode::This);
                         self.emit_opcode(Opcode::Swap);
                         self.emit_opcode(Opcode::This);
 
-                        self.emit(Opcode::GetPropertyByName, &[index]);
+                        self.emit_get_property_by_name(*name);
                         self.emit_opcode(opcode);
                         if post {
                             self.emit_opcode(Opcode::RotateRight);
                             self.emit_u8(3);
                         }
 
-                        self.emit(Opcode::SetPropertyByName, &[index]);
+                        self.emit_set_property_by_name(*name);
                         if post {
                             self.emit_opcode(Opcode::Pop);
                         }

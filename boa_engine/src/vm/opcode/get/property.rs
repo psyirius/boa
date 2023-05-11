@@ -1,4 +1,5 @@
 use crate::{
+    object::{internal_methods::InternalMethodContext, shape::slot::SlotAttributes},
     property::PropertyKey,
     vm::{opcode::Operation, CompletionType},
     Context, JsResult, JsValue,
@@ -16,7 +17,7 @@ impl Operation for GetPropertyByName {
     const INSTRUCTION: &'static str = "INST - GetPropertyByName";
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
-        let index = context.vm.read::<u32>();
+        let ic_index = context.vm.read::<u32>() as usize;
 
         let receiver = context.vm.pop();
         let value = context.vm.pop();
@@ -26,10 +27,65 @@ impl Operation for GetPropertyByName {
             value.to_object(context)?
         };
 
-        let key = context.vm.frame().code_block.names[index as usize]
-            .clone()
-            .into();
+        let ic = &context.vm.frame().code_block().ic[ic_index];
+        let mut slot = ic.slot();
+        if slot.is_cachable() {
+            let object_borrowed = object.borrow();
+            if ic.matches(object_borrowed.shape()) {
+                // println!(
+                //     "GET: T: \"{}\" {}: {:?}",
+                //     ic.name.to_std_string_escaped(),
+                //     slot.index,
+                //     slot.attributes
+                // );
+                let mut result = if slot.attributes.contains(SlotAttributes::PROTOTYPE) {
+                    let prototype = object
+                        .borrow()
+                        .properties()
+                        .shape
+                        .prototype()
+                        .expect("prototype should have value");
+                    let prototype = prototype.borrow();
+                    prototype.properties().storage[slot.index as usize].clone()
+                } else {
+                    object_borrowed.properties().storage[slot.index as usize].clone()
+                };
+
+                drop(object_borrowed);
+                if slot.attributes.has_get() && result.is_object() {
+                    result = result.as_object().expect("should contain getter").call(
+                        &receiver,
+                        &[],
+                        context,
+                    )?;
+                }
+                context.vm.push(result);
+                return Ok(CompletionType::Normal);
+            }
+        }
+
+        let key: PropertyKey = ic.name.clone().into();
+
+        let context = &mut InternalMethodContext::new(context);
         let result = object.__get__(&key, receiver, context)?;
+
+        slot = *context.slot();
+
+        // println!(
+        //     "GET: F: \"{}\" {}: {:?} - {}",
+        //     key,
+        //     slot.index,
+        //     slot.attributes,
+        //     result.type_of()
+        // );
+
+        // Cache the property.
+        if slot.attributes.is_cachable() {
+            let ic = &context.vm.frame().code_block.ic[ic_index];
+            let object_borrowed = object.borrow();
+            let shape = object_borrowed.shape().clone();
+            ic.set(shape, slot);
+        }
 
         context.vm.push(result);
         Ok(CompletionType::Normal)
@@ -75,7 +131,7 @@ impl Operation for GetPropertyByValue {
         }
 
         // Slow path:
-        let result = object.__get__(&key, receiver, context)?;
+        let result = object.__get__(&key, receiver, &mut InternalMethodContext::new(context))?;
 
         context.vm.push(result);
         Ok(CompletionType::Normal)
@@ -147,7 +203,7 @@ impl Operation for GetPropertyByValuePush {
         }
 
         // Slow path:
-        let result = object.__get__(&key, receiver, context)?;
+        let result = object.__get__(&key, receiver, &mut InternalMethodContext::new(context))?;
 
         context.vm.push(key);
         context.vm.push(result);

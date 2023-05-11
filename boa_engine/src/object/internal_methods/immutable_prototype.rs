@@ -1,9 +1,9 @@
 use crate::{
     object::{JsObject, JsPrototype},
-    Context, JsResult,
+    JsResult,
 };
 
-use super::{InternalObjectMethods, ORDINARY_INTERNAL_METHODS};
+use super::{InternalMethodContext, InternalObjectMethods, ORDINARY_INTERNAL_METHODS};
 
 /// Definitions of the internal object methods for [**Immutable Prototype Exotic Objects**][spec].
 ///
@@ -21,7 +21,7 @@ pub(crate) static IMMUTABLE_PROTOTYPE_EXOTIC_INTERNAL_METHODS: InternalObjectMet
 pub(crate) fn immutable_prototype_exotic_set_prototype_of(
     obj: &JsObject,
     val: JsPrototype,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Return ? SetImmutablePrototype(O, V).
 

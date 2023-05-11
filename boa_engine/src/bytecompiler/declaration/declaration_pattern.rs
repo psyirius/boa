@@ -39,8 +39,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(Opcode::Dup);
                             match name {
                                 PropertyName::Literal(name) => {
-                                    let index = self.get_or_insert_name((*name).into());
-                                    self.emit(Opcode::GetPropertyByName, &[index]);
+                                    self.emit_get_property_by_name(*name);
                                 }
                                 PropertyName::Computed(node) => {
                                     self.compile_expr(node, true);
@@ -111,8 +110,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(Opcode::Dup);
                             match name {
                                 PropertyName::Literal(name) => {
-                                    let index = self.get_or_insert_name((*name).into());
-                                    self.emit(Opcode::GetPropertyByName, &[index]);
+                                    self.emit_get_property_by_name(*name);
                                 }
                                 PropertyName::Computed(node) => {
                                     self.compile_expr(node, true);
@@ -151,8 +149,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(Opcode::Dup);
                             match name {
                                 PropertyName::Literal(name) => {
-                                    let index = self.get_or_insert_name((*name).into());
-                                    self.emit(Opcode::GetPropertyByName, &[index]);
+                                    self.emit_get_property_by_name(*name);
                                 }
                                 PropertyName::Computed(node) => {
                                     self.compile_expr(node, true);

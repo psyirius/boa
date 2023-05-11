@@ -3,8 +3,10 @@ use crate::{
         internal_methods::{InternalObjectMethods, ORDINARY_INTERNAL_METHODS},
         JsObject,
     },
-    Context, JsResult, JsValue,
+    JsResult, JsValue,
 };
+
+use super::InternalMethodContext;
 
 /// Definitions of the internal object methods for function objects.
 ///
@@ -36,7 +38,7 @@ fn function_call(
     obj: &JsObject,
     this: &JsValue,
     args: &[JsValue],
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsValue> {
     obj.call_internal(this, args, context)
 }
@@ -52,7 +54,7 @@ fn function_construct(
     obj: &JsObject,
     args: &[JsValue],
     new_target: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsObject> {
     obj.construct_internal(args, &new_target.clone().into(), context)
 }

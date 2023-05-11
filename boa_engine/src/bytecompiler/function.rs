@@ -154,7 +154,7 @@ impl FunctionCompiler {
         if compiler
             .bytecode
             .last()
-            .filter(|last| **last == Opcode::Return as u8)
+            .filter(|last| **last == (Opcode::Return as u8).into())
             .is_none()
         {
             compiler.emit_opcode(Opcode::Return);

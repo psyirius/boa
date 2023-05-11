@@ -2,7 +2,7 @@ use crate::{
     error::JsNativeError,
     js_string,
     native_function::NativeFunction,
-    object::{FunctionObjectBuilder, JsObject},
+    object::{internal_methods::InternalMethodContext, FunctionObjectBuilder, JsObject},
     property::{Attribute, PropertyDescriptor},
     run_test_actions, JsNativeErrorKind, JsValue, TestAction,
 };
@@ -153,7 +153,10 @@ fn closure_capture_clone() {
                         let hw = js_string!(
                             string,
                             &object
-                                .__get_own_property__(&"key".into(), context)?
+                                .__get_own_property__(
+                                    &"key".into(),
+                                    &mut InternalMethodContext::new(context)
+                                )?
                                 .and_then(|prop| prop.value().cloned())
                                 .and_then(|val| val.as_string().cloned())
                                 .ok_or_else(

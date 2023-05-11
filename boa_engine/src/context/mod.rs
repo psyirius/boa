@@ -22,7 +22,9 @@ use crate::{
     job::{JobQueue, NativeJob, SimpleJobQueue},
     module::{IdleModuleLoader, ModuleLoader, SimpleModuleLoader},
     native_function::NativeFunction,
-    object::{shape::RootShape, FunctionObjectBuilder, JsObject},
+    object::{
+        internal_methods::InternalMethodContext, shape::RootShape, FunctionObjectBuilder, JsObject,
+    },
     optimizer::{Optimizer, OptimizerOptions, OptimizerStatistics},
     property::{Attribute, PropertyDescriptor, PropertyKey},
     realm::Realm,
@@ -519,7 +521,9 @@ impl Context<'_> {
 
         // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
         let name = self.interner().resolve_expect(name.sym()).utf16().into();
-        let existing_prop = global_object.__get_own_property__(&name, self)?;
+
+        let existing_prop =
+            global_object.__get_own_property__(&name, &mut InternalMethodContext::new(self))?;
 
         // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
         let Some(existing_prop) = existing_prop else {
@@ -629,7 +633,9 @@ impl Context<'_> {
 
         // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
         let name = PropertyKey::from(self.interner().resolve_expect(name.sym()).utf16());
-        let existing_prop = global_object.__get_own_property__(&name, self)?;
+
+        let existing_prop =
+            global_object.__get_own_property__(&name, &mut InternalMethodContext::new(self))?;
 
         // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
         let desc = if existing_prop.is_none()
@@ -676,7 +682,9 @@ impl Context<'_> {
 
         // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
         let name = PropertyKey::from(self.interner().resolve_expect(name.sym()).utf16());
-        let existing_prop = global_object.__get_own_property__(&name, self)?;
+
+        let existing_prop =
+            global_object.__get_own_property__(&name, &mut InternalMethodContext::new(self))?;
 
         // 4. If existingProp is undefined, return false.
         let Some(existing_prop) = existing_prop else {

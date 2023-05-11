@@ -1,5 +1,5 @@
 use crate::{
-    object::PrivateElement,
+    object::{internal_methods::InternalMethodContext, PrivateElement},
     property::PropertyDescriptor,
     string::utf16,
     vm::{opcode::Operation, CompletionType},
@@ -31,7 +31,11 @@ impl Operation for PushClassPrivateMethod {
             .configurable(true)
             .build();
         method_object
-            .__define_own_property__(&utf16!("name").into(), desc, context)
+            .__define_own_property__(
+                &utf16!("name").into(),
+                desc,
+                &mut InternalMethodContext::new(context),
+            )
             .expect("failed to set name property on private method");
 
         let class = context.vm.pop();

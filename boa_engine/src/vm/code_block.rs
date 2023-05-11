@@ -12,7 +12,11 @@ use crate::{
     context::intrinsics::StandardConstructors,
     environments::{BindingLocator, CompileTimeEnvironment, FunctionSlots, ThisBindingStatus},
     error::JsNativeError,
-    object::{internal_methods::get_prototype_from_constructor, JsObject, ObjectData, PROTOTYPE},
+    object::{
+        internal_methods::get_prototype_from_constructor,
+        shape::{slot::Slot, Shape},
+        JsObject, ObjectData, PROTOTYPE,
+    },
     property::PropertyDescriptor,
     string::utf16,
     vm::CallFrame,
@@ -20,7 +24,7 @@ use crate::{
 };
 use bitflags::bitflags;
 use boa_ast::function::FormalParameterList;
-use boa_gc::{empty_trace, Finalize, Gc, Trace};
+use boa_gc::{empty_trace, Finalize, Gc, GcRefCell, Trace};
 use boa_interner::Sym;
 use boa_profiler::Profiler;
 use std::{
@@ -93,6 +97,56 @@ unsafe impl Trace for CodeBlockFlags {
     empty_trace!();
 }
 
+/// An inline cache entry for a property access.
+#[derive(Clone, Debug, Trace, Finalize)]
+#[allow(dead_code)]
+pub struct InlineCache {
+    /// The property that is accessed.
+    pub(crate) name: JsString,
+
+    /// A pointer is kept to the shape to avoid the shape from being deallocated.
+    pub(crate) shape: GcRefCell<Option<Shape>>,
+
+    /// Cached shape ptr used to used to check if two shapes are the same.
+    ///
+    /// This is done to avoid calling `.borrow()` on [`GcRefCell`] and [`Option`] unwrapping.
+    #[unsafe_ignore_trace]
+    pub(crate) shape_ptr: Cell<usize>,
+
+    /// The [`Slot`] of the property.
+    #[unsafe_ignore_trace]
+    pub(crate) slot: Cell<Slot>,
+}
+
+impl InlineCache {
+    pub(crate) const fn new(name: JsString) -> Self {
+        Self {
+            name,
+            shape: GcRefCell::new(None),
+            shape_ptr: Cell::new(0),
+            slot: Cell::new(Slot::new()),
+        }
+    }
+
+    pub(crate) fn set(&self, shape: Shape, slot: Slot) {
+        let shape_ptr = shape.to_addr_usize();
+        {
+            let mut shape_borrowed = self.shape.borrow_mut();
+            *shape_borrowed = Some(shape);
+        }
+        self.shape_ptr.set(shape_ptr);
+        self.slot.set(slot);
+    }
+
+    pub(crate) fn slot(&self) -> Slot {
+        self.slot.get()
+    }
+
+    pub(crate) fn matches(&self, shape: &Shape) -> bool {
+        self.shape_ptr.get() == shape.to_addr_usize()
+    }
+}
+
 /// The internal representation of a JavaScript function.
 ///
 /// A `CodeBlock` is generated for each function compiled by the
@@ -118,7 +172,8 @@ pub struct CodeBlock {
     pub(crate) params: FormalParameterList,
 
     /// Bytecode
-    pub(crate) bytecode: Box<[u8]>,
+    #[unsafe_ignore_trace]
+    pub(crate) bytecode: Box<[Cell<u8>]>,
 
     /// Literals
     pub(crate) literals: Box<[JsValue]>,
@@ -140,6 +195,9 @@ pub struct CodeBlock {
     // TODO(#3034): Maybe changing this to Gc after garbage collection would be better than Rc.
     #[unsafe_ignore_trace]
     pub(crate) compile_environments: Box<[Rc<RefCell<CompileTimeEnvironment>>]>,
+
+    /// inline caching
+    pub(crate) ic: Box<[InlineCache]>,
 }
 
 /// ---- `CodeBlock` public API ----
@@ -161,6 +219,7 @@ impl CodeBlock {
             this_mode: ThisMode::Global,
             params: FormalParameterList::default(),
             compile_environments: Box::default(),
+            ic: Box::default(),
         }
     }
 
@@ -269,7 +328,7 @@ impl CodeBlock {
     /// Returns an empty `String` if no operands are present.
     #[cfg(any(feature = "trace", feature = "flowgraph"))]
     pub(crate) fn instruction_operands(&self, pc: &mut usize, interner: &Interner) -> String {
-        let opcode: Opcode = self.bytecode[*pc].into();
+        let opcode: Opcode = self.bytecode[*pc].get().into();
         *pc += size_of::<Opcode>();
         match opcode {
             Opcode::SetFunctionName => {
@@ -395,9 +454,22 @@ impl CodeBlock {
                     interner.resolve_expect(self.bindings[operand as usize].name().sym()),
                 )
             }
-            Opcode::GetPropertyByName
-            | Opcode::GetMethod
-            | Opcode::SetPropertyByName
+            Opcode::GetPropertyByName | Opcode::SetPropertyByName => {
+                let ic_index = self.read::<u32>(*pc);
+                *pc += size_of::<u32>();
+
+                let ic = &self.ic[ic_index as usize];
+                let slot = ic.slot();
+                format!(
+                    "{:04}: '{}', Shape: 0x{:x}, Slot: index: {}, attributes {:?}",
+                    ic_index,
+                    ic.name.to_std_string_escaped(),
+                    ic.shape_ptr.get(),
+                    slot.index,
+                    slot.attributes,
+                )
+            }
+            Opcode::GetMethod
             | Opcode::DefineOwnPropertyByName
             | Opcode::DefineClassStaticMethodByName
             | Opcode::DefineClassMethodByName
@@ -643,7 +715,7 @@ impl ToInternedString for CodeBlock {
         let mut pc = 0;
         let mut count = 0;
         while pc < self.bytecode.len() {
-            let opcode: Opcode = self.bytecode[pc].into();
+            let opcode: Opcode = self.bytecode[pc].get().into();
             let opcode = opcode.as_str();
             let previous_pc = pc;
             let operands = self.instruction_operands(&mut pc, interner);

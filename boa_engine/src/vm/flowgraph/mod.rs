@@ -32,7 +32,7 @@ impl CodeBlock {
 
         let mut pc = 0;
         while pc < self.bytecode.len() {
-            let opcode: Opcode = self.bytecode[pc].into();
+            let opcode: Opcode = self.bytecode[pc].get().into();
             let opcode_str = opcode.as_str();
             let previous_pc = pc;
 
@@ -447,8 +447,16 @@ impl CodeBlock {
                     graph.add_node(previous_pc, NodeShape::None, label.into(), Color::None);
                     graph.add_edge(previous_pc, pc, None, Color::None, EdgeStyle::Line);
                 }
-                Opcode::GetPropertyByName
-                | Opcode::GetMethod
+                Opcode::GetPropertyByName => {
+                    let ic_index = self.read::<u32>(pc);
+                    pc += size_of::<u32>();
+
+                    let ic = &self.ic[ic_index as usize];
+                    let label = format!("{opcode_str} '{}'", ic.name.to_std_string_escaped());
+                    graph.add_node(previous_pc, NodeShape::None, label.into(), Color::None);
+                    graph.add_edge(previous_pc, pc, None, Color::None, EdgeStyle::Line);
+                }
+                Opcode::GetMethod
                 | Opcode::SetPropertyByName
                 | Opcode::DefineOwnPropertyByName
                 | Opcode::DefineClassStaticMethodByName

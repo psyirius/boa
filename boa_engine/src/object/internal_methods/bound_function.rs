@@ -1,6 +1,6 @@
-use crate::{object::JsObject, Context, JsResult, JsValue};
+use crate::{object::JsObject, JsResult, JsValue};
 
-use super::{InternalObjectMethods, ORDINARY_INTERNAL_METHODS};
+use super::{InternalMethodContext, InternalObjectMethods, ORDINARY_INTERNAL_METHODS};
 
 /// Definitions of the internal object methods for function objects.
 ///
@@ -32,7 +32,7 @@ fn bound_function_exotic_call(
     obj: &JsObject,
     _: &JsValue,
     arguments_list: &[JsValue],
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsValue> {
     let obj = obj.borrow();
     let bound_function = obj
@@ -67,7 +67,7 @@ fn bound_function_exotic_construct(
     obj: &JsObject,
     arguments_list: &[JsValue],
     new_target: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsObject> {
     let object = obj.borrow();
     let bound_function = object

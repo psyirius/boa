@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     environments::CompileTimeEnvironment,
-    object::{JsObject, PrivateName},
+    object::{internal_methods::InternalMethodContext, JsObject, PrivateName},
     Context, JsResult, JsString, JsSymbol, JsValue,
 };
 use boa_ast::expression::Identifier;
@@ -754,7 +754,8 @@ impl Context<'_> {
                 .interner()
                 .resolve_expect(locator.name().sym())
                 .into_common::<JsString>(false);
-            self.global_object().__delete__(&key.into(), self)
+            self.global_object()
+                .__delete__(&key.into(), &mut InternalMethodContext::new(self))
         } else {
             match self.environment_expect(locator.environment_index) {
                 Environment::Declarative(_) => Ok(false),
@@ -765,7 +766,7 @@ impl Context<'_> {
                         .resolve_expect(locator.name.sym())
                         .into_common(false);
 
-                    obj.__delete__(&key.into(), self)
+                    obj.__delete__(&key.into(), &mut InternalMethodContext::new(self))
                 }
             }
         }

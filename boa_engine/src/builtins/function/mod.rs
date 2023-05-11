@@ -20,7 +20,7 @@ use crate::{
     js_string,
     native_function::NativeFunction,
     object::{internal_methods::get_prototype_from_constructor, JsObject, Object, ObjectData},
-    object::{JsFunction, PrivateElement, PrivateName},
+    object::{internal_methods::InternalMethodContext, JsFunction, PrivateElement, PrivateName},
     property::{Attribute, PropertyDescriptor, PropertyKey},
     realm::Realm,
     string::utf16,
@@ -1100,7 +1100,8 @@ impl BoundFunction {
         context: &mut Context<'_>,
     ) -> JsResult<JsObject> {
         // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
-        let proto = target_function.__get_prototype_of__(context)?;
+        let proto =
+            target_function.__get_prototype_of__(&mut InternalMethodContext::new(context))?;
         let is_constructor = target_function.is_constructor();
 
         // 2. Let internalSlotsList be the internal slots listed in Table 35, plus [[Prototype]] and [[Extensible]].

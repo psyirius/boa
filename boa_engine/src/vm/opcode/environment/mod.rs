@@ -1,5 +1,6 @@
 use crate::{
     error::JsNativeError,
+    object::internal_methods::InternalMethodContext,
     vm::{opcode::Operation, CompletionType},
     Context, JsResult, JsValue,
 };
@@ -52,7 +53,7 @@ impl Operation for Super {
         };
 
         let value = home_object
-            .map(|o| o.__get_prototype_of__(context))
+            .map(|o| o.__get_prototype_of__(&mut InternalMethodContext::new(context)))
             .transpose()?
             .flatten()
             .map_or_else(JsValue::null, JsValue::from);
@@ -87,7 +88,7 @@ impl Operation for SuperCallPrepare {
             .clone();
         let active_function = this_env.slots().function_object().clone();
         let super_constructor = active_function
-            .__get_prototype_of__(context)
+            .__get_prototype_of__(&mut InternalMethodContext::new(context))
             .expect("function object must have prototype");
 
         if let Some(constructor) = super_constructor {
@@ -133,7 +134,11 @@ impl Operation for SuperCall {
                 .into());
         };
 
-        let result = super_constructor.__construct__(&arguments, new_target, context)?;
+        let result = super_constructor.__construct__(
+            &arguments,
+            new_target,
+            &mut InternalMethodContext::new(context),
+        )?;
 
         let this_env = context
             .vm
@@ -189,7 +194,11 @@ impl Operation for SuperCallSpread {
                 .into());
         };
 
-        let result = super_constructor.__construct__(&arguments, new_target, context)?;
+        let result = super_constructor.__construct__(
+            &arguments,
+            new_target,
+            &mut InternalMethodContext::new(context),
+        )?;
 
         let this_env = context
             .vm
@@ -239,7 +248,7 @@ impl Operation for SuperCallDerived {
             .clone();
         let active_function = this_env.slots().function_object().clone();
         let super_constructor = active_function
-            .__get_prototype_of__(context)
+            .__get_prototype_of__(&mut InternalMethodContext::new(context))
             .expect("function object must have prototype")
             .expect("function object must have prototype");
 
@@ -249,7 +258,11 @@ impl Operation for SuperCallDerived {
                 .into());
         }
 
-        let result = super_constructor.__construct__(&arguments, &new_target, context)?;
+        let result = super_constructor.__construct__(
+            &arguments,
+            &new_target,
+            &mut InternalMethodContext::new(context),
+        )?;
 
         let this_env = context
             .vm

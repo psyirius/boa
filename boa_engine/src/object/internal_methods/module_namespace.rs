@@ -5,13 +5,13 @@ use crate::{
     module::BindingName,
     object::{JsObject, JsPrototype},
     property::{PropertyDescriptor, PropertyKey},
-    Context, JsNativeError, JsResult, JsValue,
+    JsNativeError, JsResult, JsValue,
 };
 
 use super::{
     immutable_prototype, ordinary_define_own_property, ordinary_delete, ordinary_get,
     ordinary_get_own_property, ordinary_has_property, ordinary_own_property_keys,
-    InternalObjectMethods, ORDINARY_INTERNAL_METHODS,
+    InternalMethodContext, InternalObjectMethods, ORDINARY_INTERNAL_METHODS,
 };
 
 /// Definitions of the internal object methods for [**Module Namespace Exotic Objects**][spec].
@@ -39,7 +39,7 @@ pub(crate) static MODULE_NAMESPACE_EXOTIC_INTERNAL_METHODS: InternalObjectMethod
 #[allow(clippy::unnecessary_wraps)]
 fn module_namespace_exotic_get_prototype_of(
     _: &JsObject,
-    _: &mut Context<'_>,
+    _: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsPrototype> {
     // 1. Return null.
     Ok(None)
@@ -52,7 +52,7 @@ fn module_namespace_exotic_get_prototype_of(
 fn module_namespace_exotic_set_prototype_of(
     obj: &JsObject,
     val: JsPrototype,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Return ! SetImmutablePrototype(O, V).
     Ok(
@@ -65,7 +65,10 @@ fn module_namespace_exotic_set_prototype_of(
 ///
 /// [spec]: https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-isextensible
 #[allow(clippy::unnecessary_wraps)]
-fn module_namespace_exotic_is_extensible(_: &JsObject, _: &mut Context<'_>) -> JsResult<bool> {
+fn module_namespace_exotic_is_extensible(
+    _: &JsObject,
+    _: &mut InternalMethodContext<'_, '_>,
+) -> JsResult<bool> {
     // 1. Return false.
     Ok(false)
 }
@@ -74,7 +77,10 @@ fn module_namespace_exotic_is_extensible(_: &JsObject, _: &mut Context<'_>) -> J
 ///
 /// [spec]: https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-preventextensions
 #[allow(clippy::unnecessary_wraps)]
-fn module_namespace_exotic_prevent_extensions(_: &JsObject, _: &mut Context<'_>) -> JsResult<bool> {
+fn module_namespace_exotic_prevent_extensions(
+    _: &JsObject,
+    _: &mut InternalMethodContext<'_, '_>,
+) -> JsResult<bool> {
     Ok(true)
 }
 
@@ -84,7 +90,7 @@ fn module_namespace_exotic_prevent_extensions(_: &JsObject, _: &mut Context<'_>)
 fn module_namespace_exotic_get_own_property(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<Option<PropertyDescriptor>> {
     // 1. If P is a Symbol, return OrdinaryGetOwnProperty(O, P).
     let key = match key {
@@ -128,7 +134,7 @@ fn module_namespace_exotic_define_own_property(
     obj: &JsObject,
     key: &PropertyKey,
     desc: PropertyDescriptor,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. If P is a Symbol, return ! OrdinaryDefineOwnProperty(O, P, Desc).
     if let PropertyKey::Symbol(_) = key {
@@ -164,7 +170,7 @@ fn module_namespace_exotic_define_own_property(
 fn module_namespace_exotic_has_property(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. If P is a Symbol, return ! OrdinaryHasProperty(O, P).
     let key = match key {
@@ -193,7 +199,7 @@ fn module_namespace_exotic_get(
     obj: &JsObject,
     key: &PropertyKey,
     receiver: JsValue,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<JsValue> {
     // 1. If P is a Symbol, then
     //     a. Return ! OrdinaryGet(O, P, Receiver).
@@ -268,7 +274,7 @@ fn module_namespace_exotic_set(
     _key: PropertyKey,
     _value: JsValue,
     _receiver: JsValue,
-    _context: &mut Context<'_>,
+    _context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. Return false.
     Ok(false)
@@ -280,7 +286,7 @@ fn module_namespace_exotic_set(
 fn module_namespace_exotic_delete(
     obj: &JsObject,
     key: &PropertyKey,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<bool> {
     // 1. If P is a Symbol, then
     //     a. Return ! OrdinaryDelete(O, P).
@@ -308,7 +314,7 @@ fn module_namespace_exotic_delete(
 /// [spec]: https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys
 fn module_namespace_exotic_own_property_keys(
     obj: &JsObject,
-    context: &mut Context<'_>,
+    context: &mut InternalMethodContext<'_, '_>,
 ) -> JsResult<Vec<PropertyKey>> {
     // 2. Let symbolKeys be OrdinaryOwnPropertyKeys(O).
     let symbol_keys = ordinary_own_property_keys(obj, context)?;

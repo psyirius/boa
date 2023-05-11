@@ -217,8 +217,7 @@ impl ByteCompiler<'_, '_> {
                         self.emit_opcode(Opcode::Dup);
                         match access.field() {
                             PropertyAccessField::Const(field) => {
-                                let index = self.get_or_insert_name((*field).into());
-                                self.emit(Opcode::GetPropertyByName, &[index]);
+                                self.emit_get_property_by_name(*field);
                             }
                             PropertyAccessField::Expr(field) => {
                                 self.compile_expr(field, true);
