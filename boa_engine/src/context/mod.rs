@@ -6,7 +6,7 @@ pub(crate) mod icu;
 pub mod intrinsics;
 mod maybe_shared;
 
-pub use hooks::{DefaultHooks, HostHooks};
+pub use hooks::{DefaultHooks, DefaultHostDefined, HostHooks};
 #[cfg(feature = "intl")]
 pub use icu::{BoaProvider, IcuError};
 use intrinsics::Intrinsics;
@@ -256,7 +256,7 @@ impl<'host> Context<'host> {
         length: usize,
         body: NativeFunction,
     ) -> JsResult<()> {
-        let function = FunctionObjectBuilder::new(self, body)
+        let function = FunctionObjectBuilder::new(&self.realm, body)
             .name(name)
             .length(length)
             .constructor(true)
@@ -289,7 +289,7 @@ impl<'host> Context<'host> {
         length: usize,
         body: NativeFunction,
     ) -> JsResult<()> {
-        let function = FunctionObjectBuilder::new(self, body)
+        let function = FunctionObjectBuilder::new(&self.realm, body)
             .name(name)
             .length(length)
             .constructor(false)

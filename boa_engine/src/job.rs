@@ -17,7 +17,7 @@
 //! [Job]: https://tc39.es/ecma262/#sec-jobs
 //! [JobCallback]: https://tc39.es/ecma262/#sec-jobcallback-records
 
-use std::{any::Any, cell::RefCell, collections::VecDeque, fmt::Debug, future::Future, pin::Pin};
+use std::{cell::RefCell, collections::VecDeque, fmt::Debug, future::Future, pin::Pin};
 
 use crate::{
     object::{JsFunction, NativeObject},
@@ -159,7 +159,8 @@ impl Debug for JobCallback {
 
 impl JobCallback {
     /// Creates a new `JobCallback`.
-    pub fn new<T: Any + Trace>(callback: JsFunction, host_defined: T) -> Self {
+    #[inline]
+    pub fn new<T: NativeObject>(callback: JsFunction, host_defined: T) -> Self {
         Self {
             callback,
             host_defined: Box::new(host_defined),
@@ -167,18 +168,21 @@ impl JobCallback {
     }
 
     /// Gets the inner callback of the job.
+    #[inline]
     pub const fn callback(&self) -> &JsFunction {
         &self.callback
     }
 
-    /// Gets a reference to the host defined additional field as an `Any` trait object.
-    pub fn host_defined(&self) -> &dyn Any {
-        self.host_defined.as_any()
+    /// Gets a reference to the host defined additional field as an [`NativeObject`] trait object.
+    #[inline]
+    pub fn host_defined(&self) -> &dyn NativeObject {
+        &*self.host_defined
     }
 
-    /// Gets a mutable reference to the host defined additional field as an `Any` trait object.
-    pub fn host_defined_mut(&mut self) -> &mut dyn Any {
-        self.host_defined.as_mut_any()
+    /// Gets a mutable reference to the host defined additional field as an [`NativeObject`] trait object.
+    #[inline]
+    pub fn host_defined_mut(&mut self) -> &mut dyn NativeObject {
+        &mut *self.host_defined
     }
 }
 

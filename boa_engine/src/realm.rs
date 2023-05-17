@@ -10,8 +10,8 @@ use crate::{
     context::{intrinsics::Intrinsics, HostHooks},
     environments::DeclarativeEnvironment,
     module::Module,
-    object::{shape::RootShape, JsObject},
-    JsString,
+    object::{shape::RootShape, NativeObject},
+    JsObject, JsString,
 };
 use boa_gc::{Finalize, Gc, GcRefCell, Trace};
 use boa_profiler::Profiler;
@@ -52,10 +52,12 @@ struct Inner {
     global_this: JsObject,
     template_map: GcRefCell<FxHashMap<u64, JsObject>>,
     loaded_modules: GcRefCell<FxHashMap<JsString, Module>>,
+
+    host_defined: Box<dyn NativeObject>,
 }
 
 impl Realm {
-    /// Create a new Realm.
+    /// Create a new [`Realm`].
     #[inline]
     pub fn create(hooks: &dyn HostHooks, root_shape: &RootShape) -> Self {
         let _timer = Profiler::global().start_event("Realm::create", "realm");
@@ -67,6 +69,8 @@ impl Realm {
             .unwrap_or_else(|| global_object.clone());
         let environment = Gc::new(DeclarativeEnvironment::global(global_this.clone()));
 
+        let host_defined = hooks.create_host_defined_realm_field(&intrinsics);
+
         let realm = Self {
             inner: Gc::new(Inner {
                 intrinsics,
@@ -75,6 +79,7 @@ impl Realm {
                 global_this,
                 template_map: GcRefCell::default(),
                 loaded_modules: GcRefCell::default(),
+                host_defined,
             }),
         };
 
@@ -84,8 +89,17 @@ impl Realm {
     }
 
     /// Gets the intrinsics of this `Realm`.
+    #[inline]
     pub fn intrinsics(&self) -> &Intrinsics {
         &self.inner.intrinsics
+    }
+
+    /// Returns the `\[\[\HostDefined]\]` field of the [`Realm`].
+    ///
+    /// See [`HostHooks::create_host_defined_realm_field()`].
+    #[inline]
+    pub fn host_defined(&self) -> &dyn NativeObject {
+        &*self.inner.host_defined
     }
 
     pub(crate) fn environment(&self) -> &Gc<DeclarativeEnvironment> {
