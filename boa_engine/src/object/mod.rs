@@ -64,6 +64,7 @@ use crate::{
     module::ModuleNamespace,
     native_function::NativeFunction,
     property::{Attribute, PropertyDescriptor, PropertyKey},
+    realm::Realm,
     string::utf16,
     Context, JsBigInt, JsString, JsSymbol, JsValue,
 };
@@ -2146,20 +2147,20 @@ where
 
 /// Builder for creating native function objects
 #[derive(Debug)]
-pub struct FunctionObjectBuilder<'ctx, 'host> {
-    context: &'ctx mut Context<'host>,
+pub struct FunctionObjectBuilder {
+    realm: Realm,
     function: NativeFunction,
     constructor: Option<ConstructorKind>,
     name: JsString,
     length: usize,
 }
 
-impl<'ctx, 'host> FunctionObjectBuilder<'ctx, 'host> {
+impl FunctionObjectBuilder {
     /// Create a new `FunctionBuilder` for creating a native function.
     #[inline]
-    pub fn new(context: &'ctx mut Context<'host>, function: NativeFunction) -> Self {
+    pub fn new(realm: Realm, function: NativeFunction) -> Self {
         Self {
-            context,
+            realm,
             function,
             constructor: None,
             name: js_string!(),
@@ -2207,9 +2208,9 @@ impl<'ctx, 'host> FunctionObjectBuilder<'ctx, 'host> {
                 function: self.function,
                 constructor: self.constructor,
             },
-            self.context.realm().clone(),
+            self.realm.clone(),
         );
-        let object = self.context.intrinsics().templates().function().create(
+        let object = self.realm.intrinsics().templates().function().create(
             ObjectData::function(function, self.constructor.is_some()),
             vec![self.length.into(), self.name.into()],
         );
@@ -2247,27 +2248,30 @@ impl<'ctx, 'host> FunctionObjectBuilder<'ctx, 'host> {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct ObjectInitializer<'ctx, 'host> {
-    context: &'ctx mut Context<'host>,
+pub struct ObjectInitializer {
+    realm: Realm,
     object: JsObject,
 }
 
-impl<'ctx, 'host> ObjectInitializer<'ctx, 'host> {
+impl ObjectInitializer {
     /// Create a new `ObjectBuilder`.
     #[inline]
-    pub fn new(context: &'ctx mut Context<'host>) -> Self {
-        let object = JsObject::with_object_proto(context.intrinsics());
-        Self { context, object }
+    pub fn new(realm: Realm) -> Self {
+        let object = JsObject::with_object_proto(realm.intrinsics());
+        Self { realm, object }
     }
 
     /// Create a new `ObjectBuilder` with custom [`NativeObject`] data.
-    pub fn with_native<T: NativeObject>(data: T, context: &'ctx mut Context<'host>) -> Self {
+    pub fn with_native<T: NativeObject>(data: T, context: &mut Context<'_>) -> Self {
         let object = JsObject::from_proto_and_data_with_shared_shape(
             context.root_shape(),
             context.intrinsics().constructors().object().prototype(),
             ObjectData::native_object(data),
         );
-        Self { context, object }
+        Self {
+            realm: context.realm().clone(),
+            object,
+        }
     }
 
     /// Add a function to the object.
@@ -2276,7 +2280,7 @@ impl<'ctx, 'host> ObjectInitializer<'ctx, 'host> {
         B: Into<FunctionBinding>,
     {
         let binding = binding.into();
-        let function = FunctionObjectBuilder::new(self.context, function)
+        let function = FunctionObjectBuilder::new(self.realm.clone(), function)
             .name(binding.name)
             .length(length)
             .constructor(false)
@@ -2396,7 +2400,7 @@ impl<'ctx, 'host> ConstructorBuilder<'ctx, 'host> {
         B: Into<FunctionBinding>,
     {
         let binding = binding.into();
-        let function = FunctionObjectBuilder::new(self.context, function)
+        let function = FunctionObjectBuilder::new(self.context.realm().clone(), function)
             .name(binding.name)
             .length(length)
             .constructor(false)
@@ -2424,7 +2428,7 @@ impl<'ctx, 'host> ConstructorBuilder<'ctx, 'host> {
         B: Into<FunctionBinding>,
     {
         let binding = binding.into();
-        let function = FunctionObjectBuilder::new(self.context, function)
+        let function = FunctionObjectBuilder::new(self.context.realm().clone(), function)
             .name(binding.name)
             .length(length)
             .constructor(false)

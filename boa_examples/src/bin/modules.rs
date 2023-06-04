@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .then(
             Some(
                 FunctionObjectBuilder::new(
-                    context,
+                    context.realm().clone(),
                     NativeFunction::from_copy_closure_with_captures(
                         |_, _, module, context| {
                             // After loading, link all modules by resolving the imports
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .then(
             Some(
                 FunctionObjectBuilder::new(
-                    context,
+                    context.realm().clone(),
                     NativeFunction::from_copy_closure_with_captures(
                         // Finally, evaluate the root module.
                         // This returns a `JsPromise` since a module could have

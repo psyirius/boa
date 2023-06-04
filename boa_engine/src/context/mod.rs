@@ -289,7 +289,7 @@ impl<'host> Context<'host> {
         length: usize,
         body: NativeFunction,
     ) -> JsResult<()> {
-        let function = FunctionObjectBuilder::new(self.realm.clone(), body)
+        let function = FunctionObjectBuilder::new(self.realm().clone(), body)
             .name(name)
             .length(length)
             .constructor(false)
@@ -326,7 +326,7 @@ impl<'host> Context<'host> {
     where
         T: Class,
     {
-        let mut class_builder = ClassBuilder::new::<T>(self.realm.clone());
+        let mut class_builder = ClassBuilder::new::<T>(self);
         T::init(&mut class_builder)?;
 
         let class = class_builder.build();

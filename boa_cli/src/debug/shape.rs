@@ -58,7 +58,7 @@ fn same(_: &JsValue, args: &[JsValue], _: &mut Context<'_>) -> JsResult<JsValue>
 }
 
 pub(super) fn create_object(context: &mut Context<'_>) -> JsObject {
-    ObjectInitializer::new(context)
+    ObjectInitializer::new(context.realm().clone())
         .function(NativeFunction::from_fn_ptr(id), "id", 1)
         .function(NativeFunction::from_fn_ptr(r#type), "type", 1)
         .function(NativeFunction::from_fn_ptr(same), "same", 2)
