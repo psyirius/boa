@@ -1,22 +1,13 @@
 use crate::{
     builtins::promise::OperationType,
     job::JobCallback,
-    object::{JsFunction, JsObject, NativeObject},
+    object::{JsFunction, JsObject},
     realm::Realm,
     Context, JsResult, JsValue,
 };
-use boa_macros::{Finalize, Trace};
 use chrono::{DateTime, FixedOffset, Local, LocalResult, NaiveDateTime, TimeZone, Utc};
 
 use super::intrinsics::Intrinsics;
-
-/// Default `[[HostDefined]]` type.
-///
-/// This is also used to indicate that the `host-defined` has **not** been set.
-///
-/// It's a zero-size type so `Box<DefaultHostDefined>` doesn't allocate!
-#[derive(Default, Debug, Trace, Finalize)]
-pub struct DefaultHostDefined {}
 
 /// [`Host Hooks`] customizable by the host code or engine.
 ///
@@ -179,13 +170,6 @@ pub trait HostHooks {
     /// [ihdr]: https://tc39.es/ecma262/#sec-initializehostdefinedrealm
     fn create_global_this(&self, _intrinsics: &Intrinsics) -> Option<JsObject> {
         None
-    }
-
-    /// Creates the new [`Realm`]'s `[[HostDefined]]` field.
-    ///
-    /// By default it returns a [`DefaultHostDefined`] type.
-    fn create_host_defined_realm_field(&self, _intrinsics: &Intrinsics) -> Box<dyn NativeObject> {
-        Box::<DefaultHostDefined>::default()
     }
 
     /// Gets the current UTC time of the host.

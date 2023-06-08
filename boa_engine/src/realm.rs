@@ -10,8 +10,8 @@ use crate::{
     context::{intrinsics::Intrinsics, HostHooks},
     environments::DeclarativeEnvironment,
     module::Module,
-    object::{shape::RootShape, NativeObject},
-    JsObject, JsString,
+    object::shape::RootShape,
+    HostDefined, JsObject, JsString,
 };
 use boa_gc::{Finalize, Gc, GcRefCell, Trace};
 use boa_profiler::Profiler;
@@ -53,7 +53,7 @@ struct Inner {
     template_map: GcRefCell<FxHashMap<u64, JsObject>>,
     loaded_modules: GcRefCell<FxHashMap<JsString, Module>>,
 
-    host_defined: Box<dyn NativeObject>,
+    host_defined: HostDefined,
 }
 
 impl Realm {
@@ -69,8 +69,6 @@ impl Realm {
             .unwrap_or_else(|| global_object.clone());
         let environment = Gc::new(DeclarativeEnvironment::global(global_this.clone()));
 
-        let host_defined = hooks.create_host_defined_realm_field(&intrinsics);
-
         let realm = Self {
             inner: Gc::new(Inner {
                 intrinsics,
@@ -79,7 +77,7 @@ impl Realm {
                 global_this,
                 template_map: GcRefCell::default(),
                 loaded_modules: GcRefCell::default(),
-                host_defined,
+                host_defined: HostDefined::default(),
             }),
         };
 
@@ -94,12 +92,12 @@ impl Realm {
         &self.inner.intrinsics
     }
 
-    /// Returns the `\[\[\HostDefined]\]` field of the [`Realm`].
+    /// Returns the [`ECMAScript specification`][spec] defined [`\[\[\HostDefined]\]`][`HostDefined`] field of the [`Realm`].
     ///
-    /// See [`HostHooks::create_host_defined_realm_field()`].
+    /// [spec]: https://tc39.es/ecma262/#table-realm-record-fields
     #[inline]
-    pub fn host_defined(&self) -> &dyn NativeObject {
-        &*self.inner.host_defined
+    pub fn host_defined(&self) -> &HostDefined {
+        &self.inner.host_defined
     }
 
     pub(crate) fn environment(&self) -> &Gc<DeclarativeEnvironment> {

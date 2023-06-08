@@ -6,7 +6,7 @@ pub(crate) mod icu;
 pub mod intrinsics;
 mod maybe_shared;
 
-pub use hooks::{DefaultHooks, DefaultHostDefined, HostHooks};
+pub use hooks::{DefaultHooks, HostHooks};
 #[cfg(feature = "intl")]
 pub use icu::{BoaProvider, IcuError};
 use intrinsics::Intrinsics;
