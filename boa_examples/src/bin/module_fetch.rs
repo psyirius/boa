@@ -86,9 +86,9 @@ impl ModuleLoader for HttpModuleLoader {
 fn main() -> JsResult<()> {
     // A simple snippet that imports modules from the web instead of the file system.
     const SRC: &str = r#"
-        import YAML from 'https://esm.run/yaml';
-        import fromAsync from 'https://esm.run/array-from-async';
-        import { Base64 } from 'https://esm.run/js-base64';
+        import YAML from 'https://esm.run/yaml@2.3.1';
+        import fromAsync from 'https://esm.run/array-from-async@3.0.0';
+        import { Base64 } from 'https://esm.run/js-base64@3.7.5';
 
         const data = `
             object:
