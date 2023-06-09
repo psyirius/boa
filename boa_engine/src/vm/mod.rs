@@ -168,7 +168,7 @@ impl Context<'_> {
             let frame = self.vm.frame_mut();
 
             let pc = frame.pc;
-            let opcode = Opcode::from(frame.code_block.bytecode[pc as usize].get());
+            let opcode = Opcode::from(frame.code_block.bytecode[pc as usize]);
             frame.pc += 1;
             opcode
         };

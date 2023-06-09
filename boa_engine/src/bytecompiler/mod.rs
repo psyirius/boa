@@ -229,7 +229,7 @@ pub struct ByteCompiler<'ctx, 'host> {
     pub(crate) params: FormalParameterList,
 
     /// Bytecode
-    pub(crate) bytecode: Vec<Cell<u8>>,
+    pub(crate) bytecode: Vec<u8>,
 
     /// Literals
     pub(crate) literals: Vec<JsValue>,
@@ -452,15 +452,15 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
     }
 
     fn emit_u64(&mut self, value: u64) {
-        self.bytecode.extend(value.to_ne_bytes().map(Cell::new));
+        self.bytecode.extend(value.to_ne_bytes());
     }
 
     fn emit_u32(&mut self, value: u32) {
-        self.bytecode.extend(value.to_ne_bytes().map(Cell::new));
+        self.bytecode.extend(value.to_ne_bytes());
     }
 
     fn emit_u16(&mut self, value: u16) {
-        self.bytecode.extend(value.to_ne_bytes().map(Cell::new));
+        self.bytecode.extend(value.to_ne_bytes());
     }
 
     pub(crate) fn emit_opcode(&mut self, opcode: Opcode) {
@@ -468,7 +468,7 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
     }
 
     fn emit_u8(&mut self, value: u8) {
-        self.bytecode.push(Cell::new(value));
+        self.bytecode.push(value);
     }
 
     fn emit_push_integer(&mut self, value: i32) {
@@ -573,7 +573,7 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         let Label { index } = label;
 
         let index = index as usize;
-        let bytes = target.to_ne_bytes().map(Cell::new);
+        let bytes = target.to_ne_bytes();
 
         // This is done to avoid unneeded bounds checks.
         assert!(self.bytecode.len() > index + U32_SIZE && usize::MAX - U32_SIZE >= index);

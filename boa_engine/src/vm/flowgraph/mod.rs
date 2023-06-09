@@ -32,7 +32,7 @@ impl CodeBlock {
 
         let mut pc = 0;
         while pc < self.bytecode.len() {
-            let opcode: Opcode = self.bytecode[pc].get().into();
+            let opcode: Opcode = self.bytecode[pc].into();
             let opcode_str = opcode.as_str();
             let previous_pc = pc;
 

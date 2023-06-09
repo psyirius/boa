@@ -32,12 +32,6 @@ impl Operation for GetPropertyByName {
         if slot.is_cachable() {
             let object_borrowed = object.borrow();
             if ic.matches(object_borrowed.shape()) {
-                // println!(
-                //     "GET: T: \"{}\" {}: {:?}",
-                //     ic.name.to_std_string_escaped(),
-                //     slot.index,
-                //     slot.attributes
-                // );
                 let mut result = if slot.attributes.contains(SlotAttributes::PROTOTYPE) {
                     let prototype = object
                         .borrow()
@@ -70,14 +64,6 @@ impl Operation for GetPropertyByName {
         let result = object.__get__(&key, receiver, context)?;
 
         slot = *context.slot();
-
-        // println!(
-        //     "GET: F: \"{}\" {}: {:?} - {}",
-        //     key,
-        //     slot.index,
-        //     slot.attributes,
-        //     result.type_of()
-        // );
 
         // Cache the property.
         if slot.attributes.is_cachable() {

@@ -173,7 +173,7 @@ pub struct CodeBlock {
 
     /// Bytecode
     #[unsafe_ignore_trace]
-    pub(crate) bytecode: Box<[Cell<u8>]>,
+    pub(crate) bytecode: Box<[u8]>,
 
     /// Literals
     pub(crate) literals: Box<[JsValue]>,
@@ -328,7 +328,7 @@ impl CodeBlock {
     /// Returns an empty `String` if no operands are present.
     #[cfg(any(feature = "trace", feature = "flowgraph"))]
     pub(crate) fn instruction_operands(&self, pc: &mut usize, interner: &Interner) -> String {
-        let opcode: Opcode = self.bytecode[*pc].get().into();
+        let opcode: Opcode = self.bytecode[*pc].into();
         *pc += size_of::<Opcode>();
         match opcode {
             Opcode::SetFunctionName => {
@@ -715,7 +715,7 @@ impl ToInternedString for CodeBlock {
         let mut pc = 0;
         let mut count = 0;
         while pc < self.bytecode.len() {
-            let opcode: Opcode = self.bytecode[pc].get().into();
+            let opcode: Opcode = self.bytecode[pc].into();
             let opcode = opcode.as_str();
             let previous_pc = pc;
             let operands = self.instruction_operands(&mut pc, interner);

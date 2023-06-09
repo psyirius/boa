@@ -36,12 +36,6 @@ impl Operation for SetPropertyByName {
         if slot.is_cachable() {
             let object_borrowed = object.borrow();
             if ic.matches(object_borrowed.shape()) {
-                // println!(
-                //     "SET: T: \"{}\" {}: {:?}",
-                //     ic.name.to_std_string_escaped(),
-                //     slot.index,
-                //     slot.attributes
-                // );
                 let slot_index = slot.index as usize;
 
                 if slot.attributes.is_accessor_descriptor() {
@@ -96,8 +90,6 @@ impl Operation for SetPropertyByName {
         }
 
         slot = *context.slot();
-
-        // println!("SET: F: \"{}\" {}: {:?}", name, slot.index, slot.attributes);
 
         // Cache the property.
         if succeeded && slot.is_cachable() {
