@@ -17,6 +17,7 @@ use crate::{
     builtins::function::ThisMode,
     environments::{BindingLocator, BindingLocatorError, CompileTimeEnvironment},
     js_string,
+    optimizer::control_flow_graph::ControlFlowGraph,
     vm::{BindingOpcode, CodeBlock, CodeBlockFlags, Opcode},
     Context, JsBigInt, JsString, JsValue,
 };
@@ -1377,12 +1378,14 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
     #[must_use]
     #[allow(clippy::missing_const_for_fn)]
     pub fn finish(self) -> CodeBlock {
+        // FIXME: remove this, this is used to ensure that `finalize` works correctly.
+        let graph = ControlFlowGraph::generate(&self.bytecode);
         CodeBlock {
             name: self.function_name,
             length: self.length,
             this_mode: self.this_mode,
             params: self.params,
-            bytecode: self.bytecode.into_boxed_slice(),
+            bytecode: graph.finalize().into_boxed_slice(),
             literals: self.literals.into_boxed_slice(),
             names: self.names.into_boxed_slice(),
             bindings: self.bindings.into_boxed_slice(),

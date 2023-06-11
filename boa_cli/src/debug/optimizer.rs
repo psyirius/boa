@@ -1,8 +1,8 @@
 use boa_engine::{
     object::{FunctionObjectBuilder, ObjectInitializer},
-    optimizer::OptimizerOptions,
+    optimizer::{control_flow_graph::ControlFlowGraph, OptimizerOptions},
     property::Attribute,
-    Context, JsArgs, JsObject, JsResult, JsValue, NativeFunction,
+    Context, JsArgs, JsNativeError, JsObject, JsResult, JsValue, NativeFunction,
 };
 
 fn get_constant_folding(
@@ -43,6 +43,39 @@ fn set_statistics(_: &JsValue, args: &[JsValue], context: &mut Context<'_>) -> J
     Ok(JsValue::undefined())
 }
 
+fn cfg(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<JsValue> {
+    let Some(value) = args.get(0) else {
+        return Err(JsNativeError::typ()
+        .with_message("expected function argument")
+        .into());
+    };
+
+    let Some(object) = value.as_object() else {
+        return Err(JsNativeError::typ()
+        .with_message(format!("expected object, got {}", value.type_of()))
+        .into());
+    };
+    let object = object.borrow();
+    let Some(function) = object.as_function() else {
+        return Err(JsNativeError::typ()
+        .with_message("expected function object")
+        .into());
+    };
+    let code = function.codeblock().ok_or_else(|| {
+        JsNativeError::typ().with_message("native functions do not have bytecode")
+    })?;
+
+    let cfg = ControlFlowGraph::generate(code.bytecode());
+    println!("{:#?}", cfg);
+
+    let bytecode = cfg.finalize();
+    assert_eq!(code.bytecode(), &bytecode);
+
+    let cfg = ControlFlowGraph::generate(&bytecode);
+    println!("{:#?}", cfg);
+    Ok(JsValue::undefined())
+}
+
 pub(super) fn create_object(context: &mut Context<'_>) -> JsObject {
     let get_constant_folding =
         FunctionObjectBuilder::new(context, NativeFunction::from_fn_ptr(get_constant_folding))
@@ -78,5 +111,6 @@ pub(super) fn create_object(context: &mut Context<'_>) -> JsObject {
             Some(set_statistics),
             Attribute::WRITABLE | Attribute::CONFIGURABLE | Attribute::NON_ENUMERABLE,
         )
+        .function(NativeFunction::from_fn_ptr(cfg), "cfg", 1)
         .build()
 }

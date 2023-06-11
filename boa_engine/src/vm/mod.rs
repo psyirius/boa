@@ -24,7 +24,7 @@ use boa_interner::ToInternedString;
 use std::time::Instant;
 
 mod call_frame;
-mod code_block;
+pub(crate) mod code_block;
 mod completion_record;
 mod opcode;
 
