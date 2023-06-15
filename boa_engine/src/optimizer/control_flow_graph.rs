@@ -446,6 +446,9 @@ pub enum Terminator {
     None,
     /// TODO: doc
     Jump(Opcode, u32),
+
+    /// TODO: doc
+    Return,
 }
 
 impl Debug for Terminator {
@@ -455,6 +458,7 @@ impl Debug for Terminator {
             Terminator::Jump(opcode, target) => {
                 write!(f, "{} B{target}", opcode.as_str())
             }
+            Terminator::Return => write!(f, "Return"),
         }
     }
 }
@@ -472,7 +476,7 @@ impl Terminator {
 
     /// Check if unconditional [`Terminator::Jump`].
     pub fn is_unconditional_jump(&self) -> bool {
-        matches!(self, Terminator::Jump(Opcode::Jump, _))
+        matches!(self, Terminator::Jump(Opcode::Jump | Opcode::Default, _))
     }
 
     /// Check if conditional [`Terminator::Jump`].
@@ -595,6 +599,9 @@ impl ControlFlowGraph {
 
         for result in BytecodeIterator::new(bytecode) {
             match result.opcode {
+                Opcode::Return => {
+                    leaders.push(result.next_opcode_pc as u32);
+                }
                 opcode if is_jump_kind_opcode(opcode) => {
                     let target = result.read::<u32>(0);
 
@@ -639,24 +646,33 @@ impl ControlFlowGraph {
         for (i, basic_block) in basic_blocks.iter_mut().enumerate() {
             let len = basic_block.bytecode.len();
             if let Some(result) = BytecodeIterator::new(&basic_block.bytecode).last() {
-                if is_jump_kind_opcode(result.opcode) {
-                    let target = result.read::<u32>(0);
-                    let index = inverse_cfg.get(&target).expect("");
-                    basic_block.terminator = if result.opcode == Opcode::Jump {
+                if is_jump_kind_opcode(result.opcode) || result.opcode == Opcode::Return {
+                    let (terminator, remove_bytes) = if result.opcode == Opcode::Jump {
+                        let target = result.read::<u32>(0);
+                        let index = inverse_cfg.get(&target).expect("");
                         references[*index as usize].push(i as u32);
 
-                        Terminator::Jump(Opcode::Jump, *index)
+                        (Terminator::Jump(Opcode::Jump, *index), 5)
+                    } else if result.opcode == Opcode::Return {
+                        // Not refrenced by any other
+                        // if i + 1 != references.len() {
+                        //     references[i + 1].push(i as u32);
+                        // }
+                        (Terminator::Return, 1)
                     } else {
+                        let target = result.read::<u32>(0);
+                        let index = inverse_cfg.get(&target).expect("");
                         references[*index as usize].push(i as u32);
 
                         if i + 1 != references.len() {
                             references[*index as usize].push(i as u32 + 1);
                         }
 
-                        Terminator::Jump(result.opcode, *index)
+                        (Terminator::Jump(result.opcode, *index), 5)
                     };
 
-                    basic_block.bytecode.truncate(len - 5);
+                    basic_block.terminator = terminator;
+                    basic_block.bytecode.truncate(len - remove_bytes);
                 }
             }
         }
@@ -730,10 +746,14 @@ impl ControlFlowGraph {
                     results.extend_from_slice(&[0, 0, 0, 0]);
                     labels.push((start as u32, target));
                 }
+                Terminator::Return => {
+                    results.push(Opcode::Return as u8);
+                }
             }
         }
 
         for (label, block) in labels {
+            let block = self.sparse_index[block as usize];
             let block_index = blocks[block as usize];
 
             let bytes = block_index.to_ne_bytes();
