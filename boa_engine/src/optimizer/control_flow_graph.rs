@@ -445,17 +445,14 @@ pub enum Terminator {
     /// TODO: doc
     None,
     /// TODO: doc
-    JumpUnconditional(u32),
-    /// TODO: doc
-    JumpConditional(Opcode, u32),
+    Jump(Opcode, u32),
 }
 
 impl Debug for Terminator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Terminator::None => write!(f, "None"),
-            Terminator::JumpUnconditional(target) => write!(f, "Jump B{target}"),
-            Terminator::JumpConditional(opcode, target) => {
+            Terminator::Jump(opcode, target) => {
                 write!(f, "{} B{target}", opcode.as_str())
             }
         }
@@ -466,6 +463,21 @@ impl Terminator {
     /// Check if [`Terminator::None`].
     pub fn is_none(&self) -> bool {
         matches!(self, Terminator::None)
+    }
+
+    /// Check if [`Terminator::Jump`].
+    pub fn is_jump(&self) -> bool {
+        matches!(self, Terminator::Jump(_, _))
+    }
+
+    /// Check if unconditional [`Terminator::Jump`].
+    pub fn is_unconditional_jump(&self) -> bool {
+        matches!(self, Terminator::Jump(Opcode::Jump, _))
+    }
+
+    /// Check if conditional [`Terminator::Jump`].
+    pub fn is_conditional_jump(&self) -> bool {
+        matches!(self, Terminator::Jump(opcode, _) if *opcode != Opcode::Jump)
     }
 }
 
@@ -633,7 +645,7 @@ impl ControlFlowGraph {
                     basic_block.terminator = if result.opcode == Opcode::Jump {
                         references[*index as usize].push(i as u32);
 
-                        Terminator::JumpUnconditional(*index)
+                        Terminator::Jump(Opcode::Jump, *index)
                     } else {
                         references[*index as usize].push(i as u32);
 
@@ -641,7 +653,7 @@ impl ControlFlowGraph {
                             references[*index as usize].push(i as u32 + 1);
                         }
 
-                        Terminator::JumpConditional(result.opcode, *index)
+                        Terminator::Jump(result.opcode, *index)
                     };
 
                     basic_block.bytecode.truncate(len - 5);
@@ -712,13 +724,7 @@ impl ControlFlowGraph {
             results.extend(basic_block.bytecode);
             match basic_block.terminator {
                 Terminator::None => {}
-                Terminator::JumpUnconditional(target) => {
-                    results.extend_from_slice(&[Opcode::Jump as u8]);
-                    let start = results.len();
-                    results.extend_from_slice(&[0, 0, 0, 0]);
-                    labels.push((start as u32, target));
-                }
-                Terminator::JumpConditional(opcode, target) => {
+                Terminator::Jump(opcode, target) => {
                     results.extend_from_slice(&[opcode as u8]);
                     let start = results.len();
                     results.extend_from_slice(&[0, 0, 0, 0]);
