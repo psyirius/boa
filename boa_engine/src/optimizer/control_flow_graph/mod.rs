@@ -4,7 +4,7 @@
 
 use std::{fmt::Debug, iter::FusedIterator, mem::size_of};
 
-use rustc_hash::FxHashMap;
+use bitflags::bitflags;
 
 use crate::vm::{code_block::Readable, Opcode};
 
@@ -13,6 +13,7 @@ struct BytecodeIteratorResult<'bytecode> {
     next_opcode_pc: usize,
     opcode: Opcode,
     operands: &'bytecode [u8],
+    full: &'bytecode [u8],
 }
 
 impl BytecodeIteratorResult<'_> {
@@ -433,6 +434,7 @@ impl<'bytecode> Iterator for BytecodeIterator<'bytecode> {
             next_opcode_pc: self.pc,
             opcode,
             operands: &self.bytecode[start_operand_byte..end_operand_byte],
+            full: &self.bytecode[current_opcode_pc..end_operand_byte],
         })
     }
 }
@@ -440,9 +442,10 @@ impl<'bytecode> Iterator for BytecodeIterator<'bytecode> {
 impl FusedIterator for BytecodeIterator<'_> {}
 
 /// TODO: doc
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub enum Terminator {
     /// TODO: doc
+    #[default]
     None,
     /// TODO: doc
     Jump(Opcode, u32),
@@ -495,10 +498,20 @@ impl Terminator {
     }
 }
 
+bitflags! {
+    #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    struct BasicBlockFlags: u8 {
+        const REACHABLE = 0b0000_0001;
+    }
+}
+
 /// TODO: doc
+#[derive(Default, Clone)]
 pub struct BasicBlock {
+    predecessors: Vec<u32>,
     bytecode: Vec<u8>,
     terminator: Terminator,
+    flags: BasicBlockFlags,
 }
 
 impl Debug for BasicBlock {
@@ -556,6 +569,10 @@ impl BasicBlock {
 
         true
     }
+
+    fn reachable(&self) -> bool {
+        self.flags.contains(BasicBlockFlags::REACHABLE)
+    }
 }
 
 /// TODO: doc
@@ -563,8 +580,6 @@ impl BasicBlock {
 // TODO: Figure out best layout for `BasicBlock`s and
 pub struct ControlFlowGraph {
     basic_blocks: Vec<BasicBlock>,
-    sparse_index: Vec<u32>,
-    references: Vec<Vec<u32>>,
 }
 
 impl Debug for ControlFlowGraph {
@@ -572,10 +587,14 @@ impl Debug for ControlFlowGraph {
         writeln!(f, "BasicBlocks:")?;
 
         for (i, basic_block) in self.basic_blocks.iter().enumerate() {
-            write!(f, "  B{i}:")?;
-            if !self.references[i].is_empty() {
-                write!(f, " -- referenced by ")?;
-                for r in &self.references[i] {
+            write!(
+                f,
+                "  B{i}: -- {}reachable",
+                if basic_block.reachable() { "" } else { "NOT " }
+            )?;
+            if !basic_block.predecessors.is_empty() {
+                write!(f, " -- predecessors ")?;
+                for r in &basic_block.predecessors {
                     write!(f, "B{r}, ")?;
                 }
             }
@@ -603,38 +622,33 @@ const fn is_jump_kind_opcode(opcode: Opcode) -> bool {
 }
 
 impl ControlFlowGraph {
-    /// TODO: doc
-    pub fn generate(bytecode: &[u8]) -> Self {
+    /// Generate leaders for the [`BasicBlock`]s.
+    fn leaders(bytecode: &[u8]) -> (Vec<u32>, bool) {
         let mut leaders: Vec<u32> = vec![];
-
-        let mut try_environments = Vec::new();
-        let mut returns = Vec::new();
 
         for result in BytecodeIterator::new(bytecode) {
             match result.opcode {
                 Opcode::Return => {
                     leaders.push(result.next_opcode_pc as u32);
-                    if let Some((_next, finally)) = try_environments.last() {
-                        returns.push(Terminator::Return { finally: *finally });
-                    } else {
-                        returns.push(Terminator::Return { finally: None });
-                    }
                 }
                 Opcode::TryStart => {
                     let next_address = result.read::<u32>(0);
                     let finally_address = result.read::<u32>(4);
                     leaders.push(next_address);
 
-                    let mut finally = None;
                     if finally_address != u32::MAX {
                         leaders.push(finally_address);
-                        finally = Some(finally_address);
                     }
-
-                    try_environments.push((next_address, finally));
                 }
-                Opcode::TryEnd => {
-                    try_environments.pop();
+                Opcode::LoopStart => {
+                    let start = result.read::<u32>(0);
+                    let exit = result.read::<u32>(4);
+                    leaders.push(start);
+                    leaders.push(exit);
+                }
+                Opcode::LabelledStart => {
+                    let exit = result.read::<u32>(0);
+                    leaders.push(exit);
                 }
                 opcode if is_jump_kind_opcode(opcode) => {
                     let target = result.read::<u32>(0);
@@ -646,113 +660,84 @@ impl ControlFlowGraph {
             }
         }
 
-        leaders.sort_unstable();
-        if leaders.first() != Some(&0) {
-            leaders.push(0);
+        // If we have a leader at one byte after the last byte then we need an extra block for the reference to be valid.
+        let mut need_extra_block = true;
+        if leaders
+            .iter()
+            .position(|x| *x == bytecode.len() as u32)
+            .is_none()
+        {
+            need_extra_block = false;
         }
+
+        leaders.push(bytecode.len() as u32);
         leaders.sort_unstable();
         leaders.dedup();
 
-        let mut basic_blocks = Vec::new();
-        let mut inverse_cfg = FxHashMap::default();
-        for i in 0..leaders.len() {
-            let leader = leaders[i] as usize;
-            inverse_cfg.insert(leader as u32, i as u32);
-            if i + 1 == leaders.len() {
-                let vec = bytecode[leader..].to_vec();
-                basic_blocks.push(BasicBlock {
-                    bytecode: vec,
-                    terminator: Terminator::None,
-                });
-                break;
-            }
-            let next = leaders[i + 1] as usize;
-            let vec = bytecode[leader..next].to_vec();
-            basic_blocks.push(BasicBlock {
-                bytecode: vec,
-                terminator: Terminator::None,
-            });
-        }
-
-        let mut references: Vec<Vec<u32>> = Vec::new();
-        references.resize(basic_blocks.len(), Vec::new());
-
-        for (i, basic_block) in basic_blocks.iter_mut().enumerate() {
-            let len = basic_block.bytecode.len();
-            if let Some(result) = BytecodeIterator::new(&basic_block.bytecode).last() {
-                if is_jump_kind_opcode(result.opcode) || result.opcode == Opcode::Return {
-                    let (terminator, remove_bytes) = if result.opcode == Opcode::Jump {
-                        let target = result.read::<u32>(0);
-                        let index = inverse_cfg.get(&target).expect("");
-                        references[*index as usize].push(i as u32);
-
-                        (Terminator::Jump(Opcode::Jump, *index), 5)
-                    } else if result.opcode == Opcode::Return {
-                        // Not refrenced by any other
-                        // if i + 1 != references.len() {
-                        //     references[i + 1].push(i as u32);
-                        // }
-                        let mut ret = returns.remove(0);
-
-                        match &mut ret {
-                            Terminator::Return { finally } => {
-                                if let Some(finally) = finally {
-                                    let index = inverse_cfg.get(&finally).expect("");
-                                    *finally = *index;
-                                }
-                            }
-                            _ => unreachable!(),
-                        }
-
-                        (ret, 1)
-                    } else {
-                        let target = result.read::<u32>(0);
-                        let index = inverse_cfg.get(&target).expect("");
-                        references[*index as usize].push(i as u32);
-
-                        if i + 1 != references.len() {
-                            references[*index as usize].push(i as u32 + 1);
-                        }
-
-                        (Terminator::Jump(result.opcode, *index), 5)
-                    };
-
-                    basic_block.terminator = terminator;
-                    basic_block.bytecode.truncate(len - remove_bytes);
-                }
-            }
-        }
-
-        let mut sparse_index = Vec::with_capacity(basic_blocks.len());
-        for i in 0..(basic_blocks.len() as u32) {
-            sparse_index.push(i);
-        }
-
-        Self {
-            basic_blocks,
-            sparse_index,
-            references,
-        }
+        (leaders, need_extra_block)
     }
 
-    // /// Asserts that there is no other reference to this basic block.
-    // ///
-    // /// Use for `remove` method.
-    // fn assert_no_reference_to_basic_block(&self, nth: usize) {
-    //     for (i, basic_block) in self.basic_blocks.iter().enumerate() {
-    //         // We do not check for the block we are asserting on.
-    //         if i == nth {
-    //             continue;
-    //         }
+    /// TODO: doc
+    pub fn generate(bytecode: &[u8]) -> Self {
+        let (leaders, need_extra_block) = Self::leaders(bytecode);
+        let block_count = leaders.len() + usize::from(need_extra_block);
 
-    //         let nth = nth as u32;
-    //         match &basic_block.terminator {
-    //             Terminator::None => {},
-    //             Terminator::JumpUnconditional(target) => assert_ne!(*target, nth),
-    //             Terminator::JumpConditional(_opcode, target) => assert_ne!(*target, nth),
-    //         }
-    //     }
-    // }
+        let mut basic_blocks = Vec::new();
+        basic_blocks.resize_with(block_count, BasicBlock::default);
+
+        let mut iter = BytecodeIterator::new(bytecode);
+        for (i, leader) in leaders.iter().map(|x| *x as usize).enumerate() {
+            let mut bytecode = Vec::new();
+            let mut terminator = Terminator::None;
+            while let Some(result) = iter.next() {
+                match result.opcode {
+                    Opcode::Return => {
+                        terminator = Terminator::Return { finally: None };
+                    }
+                    opcode if is_jump_kind_opcode(opcode) => {
+                        let address = result.read::<u32>(0);
+                        let basic_block_index = leaders
+                            .iter()
+                            .position(|x| *x == address)
+                            .expect("There should be a basic block")
+                            + 1;
+
+                        basic_blocks[basic_block_index].predecessors.push(i as u32);
+
+                        if opcode != Opcode::Jump && i + 1 != basic_blocks.len() {
+                            basic_blocks[basic_block_index]
+                                .predecessors
+                                .push(i as u32 + 1);
+                        }
+                        terminator = Terminator::Jump(opcode, basic_block_index as u32);
+                    }
+                    _ => {
+                        bytecode.extend_from_slice(result.full);
+                    }
+                }
+
+                if leader == result.next_opcode_pc {
+                    break;
+                }
+            }
+
+            basic_blocks[i].bytecode = bytecode;
+            basic_blocks[i].terminator = terminator;
+        }
+
+        if let Some(last) = basic_blocks.last() {
+            if need_extra_block && last.predecessors.is_empty() {
+                basic_blocks.pop();
+            }
+        }
+
+        let mut sparse_index = Vec::with_capacity(block_count);
+        for i in 0..block_count {
+            sparse_index.push(i as u32);
+        }
+
+        Self { basic_blocks }
+    }
 
     // /// Remove nth [`BasicBlock`].
     // pub fn remove(&mut self, nth: usize) {
@@ -760,14 +745,12 @@ impl ControlFlowGraph {
 
     /// Get the nth [`BasicBlock`].
     pub fn get(&self, nth: usize) -> &BasicBlock {
-        let index = self.sparse_index[nth];
-        &self.basic_blocks[index as usize]
+        &self.basic_blocks[nth]
     }
 
     /// Get the nth [`BasicBlock`].
     pub fn get_mut(&mut self, nth: usize) -> &mut BasicBlock {
-        let index = self.sparse_index[nth];
-        &mut self.basic_blocks[index as usize]
+        &mut self.basic_blocks[nth]
     }
 
     /// Get [`BasicBlock`]s count in the [`ControlFlowGraph`].
@@ -799,7 +782,6 @@ impl ControlFlowGraph {
         }
 
         for (label, block) in labels {
-            let block = self.sparse_index[block as usize];
             let block_index = blocks[block as usize];
 
             let bytes = block_index.to_ne_bytes();

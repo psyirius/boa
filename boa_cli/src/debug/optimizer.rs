@@ -43,7 +43,7 @@ fn set_statistics(_: &JsValue, args: &[JsValue], context: &mut Context<'_>) -> J
     Ok(JsValue::undefined())
 }
 
-fn cfg(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<JsValue> {
+fn graph(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<JsValue> {
     let Some(value) = args.get(0) else {
         return Err(JsNativeError::typ()
         .with_message("expected function argument")
@@ -111,6 +111,6 @@ pub(super) fn create_object(context: &mut Context<'_>) -> JsObject {
             Some(set_statistics),
             Attribute::WRITABLE | Attribute::CONFIGURABLE | Attribute::NON_ENUMERABLE,
         )
-        .function(NativeFunction::from_fn_ptr(cfg), "cfg", 1)
+        .function(NativeFunction::from_fn_ptr(graph), "graph", 1)
         .build()
 }
