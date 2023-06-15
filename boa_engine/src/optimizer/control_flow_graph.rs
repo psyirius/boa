@@ -485,6 +485,44 @@ impl Debug for BasicBlock {
     }
 }
 
+impl BasicBlock {
+    /// Get nth instruction in the [`BasicBlock`].
+    fn get(&mut self, nth: usize) -> Option<BytecodeIteratorResult<'_>> {
+        BytecodeIterator::new(&self.bytecode).nth(nth)
+    }
+
+    /// Insert nth instruction in the [`BasicBlock`].
+    fn insert(&mut self, nth: usize, instruction: &[u8]) -> bool {
+        let start = if let Some(value) = self.get(nth) {
+            value.next_opcode_pc.saturating_sub(1)
+        } else {
+            0
+        };
+
+        for i in 0..instruction.len() {
+            self.bytecode.insert(start + i, instruction[i]);
+        }
+
+        true
+    }
+
+    /// Remove nth instruction in the [`BasicBlock`].
+    fn remove(&mut self, nth: usize) -> bool {
+        let Some(value) = self.get(nth) else {
+            return false;
+        };
+
+        let start = value.current_opcode_pc;
+        let length = value.next_opcode_pc - value.current_opcode_pc;
+
+        for i in 0..length {
+            self.bytecode.remove(start + i);
+        }
+
+        true
+    }
+}
+
 /// TODO: doc
 pub struct ControlFlowGraph {
     basic_blocks: Vec<BasicBlock>,
