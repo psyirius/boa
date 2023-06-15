@@ -448,18 +448,28 @@ pub enum Terminator {
     Jump(Opcode, u32),
 
     /// TODO: doc
-    Return,
+    Return {
+        /// Finally block that the return should jump to, if exists.
+        finally: Option<u32>,
+    },
 }
 
 impl Debug for Terminator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Terminator::None => write!(f, "None"),
+            Terminator::None => write!(f, "None")?,
             Terminator::Jump(opcode, target) => {
-                write!(f, "{} B{target}", opcode.as_str())
+                write!(f, "{} B{target}", opcode.as_str())?;
             }
-            Terminator::Return => write!(f, "Return"),
+            Terminator::Return { finally } => {
+                write!(f, "Return")?;
+                if let Some(finally) = finally {
+                    write!(f, " -- finally block B{finally}")?;
+                }
+            }
         }
+
+        Ok(())
     }
 }
 
@@ -597,10 +607,34 @@ impl ControlFlowGraph {
     pub fn generate(bytecode: &[u8]) -> Self {
         let mut leaders: Vec<u32> = vec![];
 
+        let mut try_environments = Vec::new();
+        let mut returns = Vec::new();
+
         for result in BytecodeIterator::new(bytecode) {
             match result.opcode {
                 Opcode::Return => {
                     leaders.push(result.next_opcode_pc as u32);
+                    if let Some((_next, finally)) = try_environments.last() {
+                        returns.push(Terminator::Return { finally: *finally });
+                    } else {
+                        returns.push(Terminator::Return { finally: None });
+                    }
+                }
+                Opcode::TryStart => {
+                    let next_address = result.read::<u32>(0);
+                    let finally_address = result.read::<u32>(4);
+                    leaders.push(next_address);
+
+                    let mut finally = None;
+                    if finally_address != u32::MAX {
+                        leaders.push(finally_address);
+                        finally = Some(finally_address);
+                    }
+
+                    try_environments.push((next_address, finally));
+                }
+                Opcode::TryEnd => {
+                    try_environments.pop();
                 }
                 opcode if is_jump_kind_opcode(opcode) => {
                     let target = result.read::<u32>(0);
@@ -658,7 +692,19 @@ impl ControlFlowGraph {
                         // if i + 1 != references.len() {
                         //     references[i + 1].push(i as u32);
                         // }
-                        (Terminator::Return, 1)
+                        let mut ret = returns.remove(0);
+
+                        match &mut ret {
+                            Terminator::Return { finally } => {
+                                if let Some(finally) = finally {
+                                    let index = inverse_cfg.get(&finally).expect("");
+                                    *finally = *index;
+                                }
+                            }
+                            _ => unreachable!(),
+                        }
+
+                        (ret, 1)
                     } else {
                         let target = result.read::<u32>(0);
                         let index = inverse_cfg.get(&target).expect("");
@@ -746,7 +792,7 @@ impl ControlFlowGraph {
                     results.extend_from_slice(&[0, 0, 0, 0]);
                     labels.push((start as u32, target));
                 }
-                Terminator::Return => {
+                Terminator::Return { .. } => {
                     results.push(Opcode::Return as u8);
                 }
             }
