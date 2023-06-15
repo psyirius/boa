@@ -66,7 +66,7 @@ fn cfg(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<Js
     })?;
 
     let cfg = ControlFlowGraph::generate(code.bytecode());
-    println!("{:#?}", cfg);
+    // println!("{:#?}", cfg);
 
     let bytecode = cfg.finalize();
     assert_eq!(code.bytecode(), &bytecode);

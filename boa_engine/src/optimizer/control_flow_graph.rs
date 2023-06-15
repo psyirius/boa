@@ -462,6 +462,13 @@ impl Debug for Terminator {
     }
 }
 
+impl Terminator {
+    /// Check if [`Terminator::None`].
+    pub fn is_none(&self) -> bool {
+        matches!(self, Terminator::None)
+    }
+}
+
 /// TODO: doc
 pub struct BasicBlock {
     bytecode: Vec<u8>,
@@ -479,7 +486,9 @@ impl Debug for BasicBlock {
                 result.opcode.as_str()
             )?;
         }
-        writeln!(f, "    Terminator: {:?}", self.terminator)?;
+        if !self.terminator.is_none() {
+            writeln!(f, "    Terminator: {:?}", self.terminator)?;
+        }
 
         Ok(())
     }
@@ -524,8 +533,11 @@ impl BasicBlock {
 }
 
 /// TODO: doc
+///
+// TODO: Figure out best layout for `BasicBlock`s and
 pub struct ControlFlowGraph {
     basic_blocks: Vec<BasicBlock>,
+    sparse_index: Vec<u32>,
     references: Vec<Vec<u32>>,
 }
 
@@ -534,10 +546,14 @@ impl Debug for ControlFlowGraph {
         writeln!(f, "BasicBlocks:")?;
 
         for (i, basic_block) in self.basic_blocks.iter().enumerate() {
-            write!(f, "  B{i}: -- referenced by ")?;
-            for r in &self.references[i] {
-                write!(f, "B{r}, ")?;
+            write!(f, "  B{i}:")?;
+            if !self.references[i].is_empty() {
+                write!(f, " -- referenced by ")?;
+                for r in &self.references[i] {
+                    write!(f, "B{r}, ")?;
+                }
             }
+
             writeln!(f, "")?;
 
             writeln!(f, "{basic_block:#?}")?;
@@ -555,6 +571,8 @@ const fn is_jump_kind_opcode(opcode: Opcode) -> bool {
             | Opcode::JumpIfFalse
             | Opcode::JumpIfNotUndefined
             | Opcode::JumpIfNullOrUndefined
+            | Opcode::Case
+            | Opcode::Default
     )
 }
 
@@ -631,10 +649,56 @@ impl ControlFlowGraph {
             }
         }
 
+        let mut sparse_index = Vec::with_capacity(basic_blocks.len());
+        for i in 0..(basic_blocks.len() as u32) {
+            sparse_index.push(i);
+        }
+
         Self {
             basic_blocks,
+            sparse_index,
             references,
         }
+    }
+
+    // /// Asserts that there is no other reference to this basic block.
+    // ///
+    // /// Use for `remove` method.
+    // fn assert_no_reference_to_basic_block(&self, nth: usize) {
+    //     for (i, basic_block) in self.basic_blocks.iter().enumerate() {
+    //         // We do not check for the block we are asserting on.
+    //         if i == nth {
+    //             continue;
+    //         }
+
+    //         let nth = nth as u32;
+    //         match &basic_block.terminator {
+    //             Terminator::None => {},
+    //             Terminator::JumpUnconditional(target) => assert_ne!(*target, nth),
+    //             Terminator::JumpConditional(_opcode, target) => assert_ne!(*target, nth),
+    //         }
+    //     }
+    // }
+
+    // /// Remove nth [`BasicBlock`].
+    // pub fn remove(&mut self, nth: usize) {
+    // }
+
+    /// Get the nth [`BasicBlock`].
+    pub fn get(&self, nth: usize) -> &BasicBlock {
+        let index = self.sparse_index[nth];
+        &self.basic_blocks[index as usize]
+    }
+
+    /// Get the nth [`BasicBlock`].
+    pub fn get_mut(&mut self, nth: usize) -> &mut BasicBlock {
+        let index = self.sparse_index[nth];
+        &mut self.basic_blocks[index as usize]
+    }
+
+    /// Get [`BasicBlock`]s count in the [`ControlFlowGraph`].
+    pub fn basic_blocks_len(&self) -> u32 {
+        self.basic_blocks.len() as u32
     }
 
     /// Finalize bytecode.
