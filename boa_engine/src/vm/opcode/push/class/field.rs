@@ -14,6 +14,7 @@ pub(crate) struct PushClassField;
 impl Operation for PushClassField {
     const NAME: &'static str = "PushClassField";
     const INSTRUCTION: &'static str = "INST - PushClassField";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let field_function_value = context.vm.pop();
@@ -55,6 +56,7 @@ pub(crate) struct PushClassFieldPrivate;
 impl Operation for PushClassFieldPrivate {
     const NAME: &'static str = "PushClassFieldPrivate";
     const INSTRUCTION: &'static str = "INST - PushClassFieldPrivate";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

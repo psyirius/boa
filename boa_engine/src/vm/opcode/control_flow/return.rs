@@ -13,6 +13,7 @@ pub(crate) struct Return;
 impl Operation for Return {
     const NAME: &'static str = "Return";
     const INSTRUCTION: &'static str = "INST - Return";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let current_address = context.vm.frame().pc;

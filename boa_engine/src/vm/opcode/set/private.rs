@@ -16,6 +16,7 @@ pub(crate) struct SetPrivateField;
 impl Operation for SetPrivateField {
     const NAME: &'static str = "SetPrivateField";
     const INSTRUCTION: &'static str = "INST - SetPrivateField";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -46,6 +47,7 @@ pub(crate) struct DefinePrivateField;
 impl Operation for DefinePrivateField {
     const NAME: &'static str = "DefinePrivateField";
     const INSTRUCTION: &'static str = "INST - DefinePrivateField";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -74,6 +76,7 @@ pub(crate) struct SetPrivateMethod;
 impl Operation for SetPrivateMethod {
     const NAME: &'static str = "SetPrivateMethod";
     const INSTRUCTION: &'static str = "INST - SetPrivateMethod";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -121,6 +124,7 @@ pub(crate) struct SetPrivateSetter;
 impl Operation for SetPrivateSetter {
     const NAME: &'static str = "SetPrivateSetter";
     const INSTRUCTION: &'static str = "INST - SetPrivateSetter";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -159,6 +163,7 @@ pub(crate) struct SetPrivateGetter;
 impl Operation for SetPrivateGetter {
     const NAME: &'static str = "SetPrivateGetter";
     const INSTRUCTION: &'static str = "INST - SetPrivateGetter";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

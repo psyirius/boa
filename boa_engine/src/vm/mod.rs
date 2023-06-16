@@ -16,7 +16,7 @@ use crate::{
 
 use boa_gc::{custom_trace, Finalize, Gc, Trace};
 use boa_profiler::Profiler;
-use std::mem::size_of;
+use std::{future::Future, mem::size_of, ops::ControlFlow, pin::Pin, task};
 
 #[cfg(feature = "trace")]
 use boa_interner::ToInternedString;
@@ -156,38 +156,63 @@ pub(crate) enum CompletionType {
     Throw,
 }
 
+#[cfg(feature = "trace")]
+const COLUMN_WIDTH: usize = 26;
+#[cfg(feature = "trace")]
+const TIME_COLUMN_WIDTH: usize = COLUMN_WIDTH / 2;
+#[cfg(feature = "trace")]
+const OPCODE_COLUMN_WIDTH: usize = COLUMN_WIDTH;
+#[cfg(feature = "trace")]
+const OPERAND_COLUMN_WIDTH: usize = COLUMN_WIDTH;
+#[cfg(feature = "trace")]
+const NUMBER_OF_COLUMNS: usize = 4;
+
 impl Context<'_> {
-    fn execute_instruction(&mut self) -> JsResult<CompletionType> {
-        let opcode: Opcode = {
-            let _timer = Profiler::global().start_event("Opcode retrieval", "vm");
+    /// Runs the current frame to completion, yielding to the execution each time `budget`
+    /// "clock cycles" have passed.
+    #[allow(clippy::future_not_send)]
+    pub(crate) async fn run_async_with_budget(&mut self, budget: usize) -> CompletionRecord {
+        let _timer = Profiler::global().start_event("run_async_with_budget", "vm");
 
-            let frame = self.vm.frame_mut();
+        let mut total_cost: usize = 0;
 
-            let pc = frame.pc;
-            let opcode = Opcode::from(frame.code_block.bytecode[pc as usize]);
-            frame.pc += 1;
-            opcode
+        self.prepare_for_run();
+
+        let completion = loop {
+            let completion = self.run_next_instruction(|opcode, context| {
+                total_cost = total_cost.checked_add(opcode.cost()).unwrap_or(usize::MAX);
+                total_cost += opcode.cost();
+                opcode.execute(context)
+            });
+            if let ControlFlow::Break(completion) = completion {
+                break completion;
+            }
+            if total_cost >= budget {
+                total_cost = 0;
+                yield_now().await;
+            }
         };
 
-        let _timer = Profiler::global().start_event(opcode.as_instruction_str(), "vm");
-
-        opcode.execute(self)
+        self.finish_run(completion)
     }
 
+    /// Runs the current frame to completion.
     pub(crate) fn run(&mut self) -> CompletionRecord {
-        #[cfg(feature = "trace")]
-        const COLUMN_WIDTH: usize = 26;
-        #[cfg(feature = "trace")]
-        const TIME_COLUMN_WIDTH: usize = COLUMN_WIDTH / 2;
-        #[cfg(feature = "trace")]
-        const OPCODE_COLUMN_WIDTH: usize = COLUMN_WIDTH;
-        #[cfg(feature = "trace")]
-        const OPERAND_COLUMN_WIDTH: usize = COLUMN_WIDTH;
-        #[cfg(feature = "trace")]
-        const NUMBER_OF_COLUMNS: usize = 4;
-
         let _timer = Profiler::global().start_event("run", "vm");
 
+        self.prepare_for_run();
+
+        let completion = loop {
+            if let ControlFlow::Break(completion) = self.run_next_instruction(Opcode::execute) {
+                break completion;
+            }
+        };
+
+        self.finish_run(completion)
+    }
+
+    /// Prepares the current frame for running code.
+    fn prepare_for_run(&mut self) {
         #[cfg(feature = "trace")]
         if self.vm.trace {
             let msg = if self.vm.frames.last().is_some() {
@@ -219,49 +244,70 @@ impl Context<'_> {
         self.vm
             .frame_mut()
             .set_frame_pointer(current_stack_length as u32);
+    }
 
-        // If the current executing function is an async function we have to resolve/reject it's promise at the end.
-        // The relevant spec section is 3. in [AsyncBlockStart](https://tc39.es/ecma262/#sec-asyncblockstart).
-        let promise_capability = self.vm.frame().promise_capability.clone();
+    /// Runs `f` for the next instruction in the current frame.
+    fn run_next_instruction<F>(&mut self, f: F) -> ControlFlow<CompletionType>
+    where
+        F: FnOnce(Opcode, &mut Context<'_>) -> JsResult<CompletionType>,
+    {
+        fn next_op<F>(context: &mut Context<'_>, f: F) -> JsResult<CompletionType>
+        where
+            F: FnOnce(Opcode, &mut Context<'_>) -> JsResult<CompletionType>,
+        {
+            let opcode: Opcode = {
+                let _timer = Profiler::global().start_event("Opcode retrieval", "vm");
 
-        let execution_completion = loop {
-            // 1. Exit the execution loop if program counter ever is equal to or exceeds the amount of instructions
-            if self.vm.frame().code_block.bytecode.len() <= self.vm.frame().pc as usize {
-                break CompletionType::Normal;
+                let frame = context.vm.frame_mut();
+
+                let pc = frame.pc;
+                let opcode = Opcode::from(frame.code_block.bytecode[pc as usize]);
+                frame.pc += 1;
+                opcode
+            };
+
+            let _timer = Profiler::global().start_event(opcode.as_instruction_str(), "vm");
+
+            f(opcode, context)
+        }
+
+        // 1. Exit the execution loop if program counter ever is equal to or exceeds the amount of instructions
+        if self.vm.frame().code_block.bytecode.len() <= self.vm.frame().pc as usize {
+            return ControlFlow::Break(CompletionType::Normal);
+        }
+
+        #[cfg(feature = "fuzz")]
+        {
+            if self.instructions_remaining == 0 {
+                let err = JsError::from_native(JsNativeError::no_instructions_remain());
+                self.vm.err = Some(err);
+                return ControlFlow::Break(CompletionType::Return);
             }
+            self.instructions_remaining -= 1;
+        }
 
-            #[cfg(feature = "fuzz")]
-            {
-                if self.instructions_remaining == 0 {
-                    let err = JsError::from_native(JsNativeError::no_instructions_remain());
-                    self.vm.err = Some(err);
-                    break CompletionType::Throw;
-                }
-                self.instructions_remaining -= 1;
-            }
+        // 1. Run the next instruction.
+        #[cfg(feature = "trace")]
+        let result = if self.vm.trace || self.vm.frame().code_block.traceable() {
+            let mut pc = self.vm.frame().pc as usize;
+            let opcode: Opcode = self
+                .vm
+                .frame()
+                .code_block
+                .read::<u8>(pc)
+                .try_into()
+                .expect("invalid opcode");
+            let operands = self
+                .vm
+                .frame()
+                .code_block
+                .instruction_operands(&mut pc, self.interner());
 
-            // 1. Run the next instruction.
-            #[cfg(feature = "trace")]
-            let result = if self.vm.trace || self.vm.frame().code_block.traceable() {
-                let mut pc = self.vm.frame().pc as usize;
-                let opcode: Opcode = self
-                    .vm
-                    .frame()
-                    .code_block
-                    .read::<u8>(pc)
-                    .try_into()
-                    .expect("invalid opcode");
-                let operands = self
-                    .vm
-                    .frame()
-                    .code_block
-                    .instruction_operands(&mut pc, self.interner());
+            let instant = Instant::now();
+            let result = next_op(self, f);
 
-                let instant = Instant::now();
-                let result = self.execute_instruction();
-
-                let duration = instant.elapsed();
-                println!(
+            let duration = instant.elapsed();
+            println!(
                     "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {}",
                     format!("{}μs", duration.as_micros()),
                     opcode.as_str(),
@@ -273,61 +319,59 @@ impl Context<'_> {
                     },
                 );
 
-                result
-            } else {
-                self.execute_instruction()
-            };
+            result
+        } else {
+            next_op(self, f)
+        };
 
-            #[cfg(not(feature = "trace"))]
-            let result = self.execute_instruction();
+        #[cfg(not(feature = "trace"))]
+        let result = next_op(self, f);
 
-            // 2. Evaluate the result of executing the instruction.
-            match result {
-                Ok(CompletionType::Normal) => {}
-                Ok(CompletionType::Return) => {
-                    break CompletionType::Return;
-                }
-                Ok(CompletionType::Throw) => {
-                    break CompletionType::Throw;
-                }
-                Err(err) => {
-                    #[cfg(feature = "fuzz")]
-                    {
-                        if let Some(native_error) = err.as_native() {
-                            // If we hit the execution step limit, bubble up the error to the
-                            // (Rust) caller instead of trying to handle as an exception.
-                            if native_error.is_no_instructions_remain() {
-                                self.vm.err = Some(err);
-                                break CompletionType::Throw;
-                            }
-                        }
-                    }
-
+        // 2. Evaluate the result of executing the instruction.
+        match result {
+            Ok(CompletionType::Normal) => ControlFlow::Continue(()),
+            Ok(CompletionType::Return) => ControlFlow::Break(CompletionType::Return),
+            Ok(CompletionType::Throw) => ControlFlow::Break(CompletionType::Throw),
+            Err(err) => {
+                #[cfg(feature = "fuzz")]
+                {
                     if let Some(native_error) = err.as_native() {
                         // If we hit the execution step limit, bubble up the error to the
                         // (Rust) caller instead of trying to handle as an exception.
-                        if native_error.is_runtime_limit() {
+                        if native_error.is_no_instructions_remain() {
                             self.vm.err = Some(err);
-                            break CompletionType::Throw;
+                            return ControlFlow::Break(CompletionType::Throw);
                         }
                     }
+                }
 
-                    self.vm.err = Some(err);
-
-                    // If this frame has not evaluated the throw as an AbruptCompletion, then evaluate it
-                    let evaluation = Opcode::Throw
-                        .execute(self)
-                        .expect("Opcode::Throw cannot return Err");
-
-                    if evaluation == CompletionType::Normal {
-                        continue;
+                if let Some(native_error) = err.as_native() {
+                    // If we hit the execution step limit, bubble up the error to the
+                    // (Rust) caller instead of trying to handle as an exception.
+                    if native_error.is_runtime_limit() {
+                        self.vm.err = Some(err);
+                        return ControlFlow::Break(CompletionType::Throw);
                     }
+                }
 
-                    break CompletionType::Throw;
+                self.vm.err = Some(err);
+
+                // If this frame has not evaluated the throw as an AbruptCompletion, then evaluate it
+                let evaluation = Opcode::Throw
+                    .execute(self)
+                    .expect("Opcode::Throw cannot return Err");
+
+                if evaluation == CompletionType::Normal {
+                    ControlFlow::Continue(())
+                } else {
+                    ControlFlow::Break(CompletionType::Throw)
                 }
             }
-        };
+        }
+    }
 
+    /// Finishes running the current frame, cleaning up and returning errors if necessary.
+    fn finish_run(&mut self, completion: CompletionType) -> CompletionRecord {
         // Early return immediately after loop.
         if self.vm.frame().r#yield {
             self.vm.frame_mut().r#yield = false;
@@ -360,11 +404,11 @@ impl Context<'_> {
         }
 
         // Determine the execution result
-        let execution_result = if execution_completion == CompletionType::Throw {
+        let execution_result = if completion == CompletionType::Throw {
             self.vm.frame_mut().abrupt_completion = None;
             self.vm.stack.truncate(self.vm.frame().fp as usize);
             JsValue::undefined()
-        } else if execution_completion == CompletionType::Return {
+        } else if completion == CompletionType::Return {
             self.vm.frame_mut().abrupt_completion = None;
             let result = self.vm.pop();
             self.vm.stack.truncate(self.vm.frame().fp as usize);
@@ -377,8 +421,10 @@ impl Context<'_> {
             result
         };
 
-        if let Some(promise) = promise_capability {
-            match execution_completion {
+        // If the current executing function is an async function we have to resolve/reject it's promise at the end.
+        // The relevant spec section is 3. in [AsyncBlockStart](https://tc39.es/ecma262/#sec-asyncblockstart).
+        if let Some(promise) = self.vm.frame().promise_capability.clone() {
+            match completion {
                 CompletionType::Normal => {
                     promise
                         .resolve()
@@ -416,7 +462,7 @@ impl Context<'_> {
                 .expect("must have item in queue");
             drop(generator_object_mut);
 
-            if execution_completion == CompletionType::Throw {
+            if completion == CompletionType::Throw {
                 AsyncGenerator::complete_step(
                     &next,
                     Err(self
@@ -437,7 +483,7 @@ impl Context<'_> {
         }
 
         // Any valid return statement is re-evaluated as a normal completion vs. return (yield).
-        if execution_completion == CompletionType::Throw {
+        if completion == CompletionType::Throw {
             return CompletionRecord::Throw(
                 self.vm
                     .err
@@ -447,4 +493,25 @@ impl Context<'_> {
         }
         CompletionRecord::Normal(execution_result)
     }
+}
+
+/// Yields once to the executor.
+fn yield_now() -> impl Future<Output = ()> {
+    struct YieldNow(bool);
+
+    impl Future for YieldNow {
+        type Output = ();
+
+        fn poll(mut self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+            if self.0 {
+                task::Poll::Ready(())
+            } else {
+                self.0 = true;
+                cx.waker().wake_by_ref();
+                task::Poll::Pending
+            }
+        }
+    }
+
+    YieldNow(false)
 }

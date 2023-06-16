@@ -10,9 +10,11 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ConcatToString;
 
+// TODO: This should probably be decomposed into smaller ops.
 impl Operation for ConcatToString {
     const NAME: &'static str = "ConcatToString";
     const INSTRUCTION: &'static str = "INST - ConcatToString";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value_count = context.vm.read::<u32>();

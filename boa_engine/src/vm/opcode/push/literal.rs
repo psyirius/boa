@@ -13,6 +13,7 @@ pub(crate) struct PushLiteral;
 impl Operation for PushLiteral {
     const NAME: &'static str = "PushLiteral";
     const INSTRUCTION: &'static str = "INST - PushLiteral";
+    const COST: usize = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>() as usize;

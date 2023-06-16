@@ -14,6 +14,7 @@ pub(crate) struct This;
 impl Operation for This {
     const NAME: &'static str = "This";
     const INSTRUCTION: &'static str = "INST - This";
+    const COST: usize = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let this = context.vm.environments.get_this_binding()?;
@@ -32,6 +33,7 @@ pub(crate) struct Super;
 impl Operation for Super {
     const NAME: &'static str = "Super";
     const INSTRUCTION: &'static str = "INST - Super";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let home_object = {
@@ -72,6 +74,7 @@ pub(crate) struct SuperCallPrepare;
 impl Operation for SuperCallPrepare {
     const NAME: &'static str = "SuperCallPrepare";
     const INSTRUCTION: &'static str = "INST - SuperCallPrepare";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let this_env = context
@@ -111,6 +114,7 @@ pub(crate) struct SuperCall;
 impl Operation for SuperCall {
     const NAME: &'static str = "SuperCall";
     const INSTRUCTION: &'static str = "INST - SuperCall";
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let argument_count = context.vm.read::<u32>();
@@ -162,6 +166,7 @@ pub(crate) struct SuperCallSpread;
 impl Operation for SuperCallSpread {
     const NAME: &'static str = "SuperCallWithRest";
     const INSTRUCTION: &'static str = "INST - SuperCallWithRest";
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         // Get the arguments that are stored as an array object on the stack.
@@ -218,6 +223,7 @@ pub(crate) struct SuperCallDerived;
 impl Operation for SuperCallDerived {
     const NAME: &'static str = "SuperCallDerived";
     const INSTRUCTION: &'static str = "INST - SuperCallDerived";
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let argument_count = context.vm.frame().argument_count;

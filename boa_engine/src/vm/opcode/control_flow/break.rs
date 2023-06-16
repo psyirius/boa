@@ -12,6 +12,7 @@ pub(crate) struct Break;
 impl Operation for Break {
     const NAME: &'static str = "Break";
     const INSTRUCTION: &'static str = "INST - Break";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let jump_address = context.vm.read::<u32>();
@@ -71,6 +72,7 @@ pub(crate) struct BreakLabel;
 impl Operation for BreakLabel {
     const NAME: &'static str = "BreakLabel";
     const INSTRUCTION: &'static str = "INST - BreakLabel";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let jump_address = context.vm.read::<u32>();

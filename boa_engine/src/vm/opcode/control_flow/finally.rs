@@ -13,6 +13,7 @@ pub(crate) struct FinallyStart;
 impl Operation for FinallyStart {
     const NAME: &'static str = "FinallyStart";
     const INSTRUCTION: &'static str = "INST - FinallyStart";
+    const COST: usize = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let exit = context.vm.read::<u32>();
@@ -39,6 +40,7 @@ pub(crate) struct FinallyEnd;
 impl Operation for FinallyEnd {
     const NAME: &'static str = "FinallyEnd";
     const INSTRUCTION: &'static str = "INST - FinallyEnd";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let finally_candidates = context

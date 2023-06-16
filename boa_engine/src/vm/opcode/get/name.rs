@@ -14,6 +14,7 @@ pub(crate) struct GetName;
 impl Operation for GetName {
     const NAME: &'static str = "GetName";
     const INSTRUCTION: &'static str = "INST - GetName";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -42,6 +43,7 @@ pub(crate) struct GetLocator;
 impl Operation for GetLocator {
     const NAME: &'static str = "GetLocator";
     const INSTRUCTION: &'static str = "INST - GetLocator";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -65,6 +67,7 @@ pub(crate) struct GetNameAndLocator;
 impl Operation for GetNameAndLocator {
     const NAME: &'static str = "GetNameAndLocator";
     const INSTRUCTION: &'static str = "INST - GetNameAndLocator";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -94,6 +97,7 @@ pub(crate) struct GetNameOrUndefined;
 impl Operation for GetNameOrUndefined {
     const NAME: &'static str = "GetNameOrUndefined";
     const INSTRUCTION: &'static str = "INST - GetNameOrUndefined";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

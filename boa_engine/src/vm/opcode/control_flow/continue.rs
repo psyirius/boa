@@ -16,6 +16,7 @@ pub(crate) struct Continue;
 impl Operation for Continue {
     const NAME: &'static str = "Continue";
     const INSTRUCTION: &'static str = "INST - Continue";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let jump_address = context.vm.read::<u32>();

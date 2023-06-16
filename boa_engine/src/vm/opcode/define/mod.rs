@@ -19,6 +19,7 @@ pub(crate) struct DefVar;
 impl Operation for DefVar {
     const NAME: &'static str = "DefVar";
     const INSTRUCTION: &'static str = "INST - DefVar";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         // TODO: spec specifies to return `empty` on empty vars, but we're trying to initialize.
@@ -48,6 +49,7 @@ pub(crate) struct DefInitVar;
 impl Operation for DefInitVar {
     const NAME: &'static str = "DefInitVar";
     const INSTRUCTION: &'static str = "INST - DefInitVar";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -76,6 +78,7 @@ pub(crate) struct PutLexicalValue;
 impl Operation for PutLexicalValue {
     const NAME: &'static str = "PutLexicalValue";
     const INSTRUCTION: &'static str = "INST - PutLexicalValue";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

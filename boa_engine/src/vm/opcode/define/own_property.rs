@@ -14,6 +14,7 @@ pub(crate) struct DefineOwnPropertyByName;
 impl Operation for DefineOwnPropertyByName {
     const NAME: &'static str = "DefineOwnPropertyByName";
     const INSTRUCTION: &'static str = "INST - DefineOwnPropertyByName";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -49,6 +50,7 @@ pub(crate) struct DefineOwnPropertyByValue;
 impl Operation for DefineOwnPropertyByValue {
     const NAME: &'static str = "DefineOwnPropertyByValue";
     const INSTRUCTION: &'static str = "INST - DefineOwnPropertyByValue";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();

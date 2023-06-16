@@ -13,6 +13,7 @@ pub(crate) struct CatchStart;
 impl Operation for CatchStart {
     const NAME: &'static str = "CatchStart";
     const INSTRUCTION: &'static str = "INST - CatchStart";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let start = context.vm.frame().pc - 1;
@@ -39,6 +40,7 @@ pub(crate) struct CatchEnd;
 impl Operation for CatchEnd {
     const NAME: &'static str = "CatchEnd";
     const INSTRUCTION: &'static str = "INST - CatchEnd";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let mut envs_to_pop = 0_usize;
@@ -67,6 +69,7 @@ pub(crate) struct CatchEnd2;
 impl Operation for CatchEnd2 {
     const NAME: &'static str = "CatchEnd2";
     const INSTRUCTION: &'static str = "INST - CatchEnd2";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if let Some(catch_entry) = context

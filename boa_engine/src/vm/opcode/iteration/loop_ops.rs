@@ -14,6 +14,7 @@ pub(crate) struct IteratorLoopStart;
 impl Operation for IteratorLoopStart {
     const NAME: &'static str = "IteratorLoopStart";
     const INSTRUCTION: &'static str = "INST - IteratorLoopStart";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let start = context.vm.read::<u32>();
@@ -37,6 +38,7 @@ pub(crate) struct LoopStart;
 impl Operation for LoopStart {
     const NAME: &'static str = "LoopStart";
     const INSTRUCTION: &'static str = "INST - LoopStart";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let start = context.vm.read::<u32>();
@@ -59,6 +61,7 @@ pub(crate) struct LoopContinue;
 impl Operation for LoopContinue {
     const NAME: &'static str = "LoopContinue";
     const INSTRUCTION: &'static str = "INST - LoopContinue";
+    const COST: usize = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         // 1. Clean up the previous environment.
@@ -101,6 +104,7 @@ pub(crate) struct LoopEnd;
 impl Operation for LoopEnd {
     const NAME: &'static str = "LoopEnd";
     const INSTRUCTION: &'static str = "INST - LoopEnd";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let mut envs_to_pop = 0_usize;
@@ -131,6 +135,7 @@ pub(crate) struct LoopUpdateReturnValue;
 impl Operation for LoopUpdateReturnValue {
     const NAME: &'static str = "LoopUpdateReturnValue";
     const INSTRUCTION: &'static str = "INST - LoopUpdateReturnValue";
+    const COST: usize = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();

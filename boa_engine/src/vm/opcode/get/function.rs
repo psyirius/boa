@@ -13,6 +13,7 @@ pub(crate) struct GetArrowFunction;
 impl Operation for GetArrowFunction {
     const NAME: &'static str = "GetArrowFunction";
     const INSTRUCTION: &'static str = "INST - GetArrowFunction";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -34,6 +35,7 @@ pub(crate) struct GetAsyncArrowFunction;
 impl Operation for GetAsyncArrowFunction {
     const NAME: &'static str = "GetAsyncArrowFunction";
     const INSTRUCTION: &'static str = "INST - GetAsyncArrowFunction";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -55,6 +57,7 @@ pub(crate) struct GetFunction;
 impl Operation for GetFunction {
     const NAME: &'static str = "GetFunction";
     const INSTRUCTION: &'static str = "INST - GetFunction";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -76,6 +79,7 @@ pub(crate) struct GetFunctionAsync;
 impl Operation for GetFunctionAsync {
     const NAME: &'static str = "GetFunctionAsync";
     const INSTRUCTION: &'static str = "INST - GetFunctionAsync";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

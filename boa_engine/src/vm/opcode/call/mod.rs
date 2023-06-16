@@ -17,6 +17,9 @@ pub(crate) struct CallEval;
 impl Operation for CallEval {
     const NAME: &'static str = "CallEval";
     const INSTRUCTION: &'static str = "INST - CallEval";
+    // TODO: Calls will require a big refactor in order to track
+    // the cost of the call.
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -85,6 +88,9 @@ pub(crate) struct CallEvalSpread;
 impl Operation for CallEvalSpread {
     const NAME: &'static str = "CallEvalSpread";
     const INSTRUCTION: &'static str = "INST - CallEvalSpread";
+    // TODO: Calls will require a big refactor in order to track
+    // the cost of the call.
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -159,6 +165,9 @@ pub(crate) struct Call;
 impl Operation for Call {
     const NAME: &'static str = "Call";
     const INSTRUCTION: &'static str = "INST - Call";
+    // TODO: Calls will require a big refactor in order to track
+    // the cost of the call.
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -206,6 +215,9 @@ pub(crate) struct CallSpread;
 impl Operation for CallSpread {
     const NAME: &'static str = "CallSpread";
     const INSTRUCTION: &'static str = "INST - CallSpread";
+    // TODO: Calls will require a big refactor in order to track
+    // the cost of the call.
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -263,6 +275,9 @@ pub(crate) struct ImportCall;
 impl Operation for ImportCall {
     const NAME: &'static str = "ImportCall";
     const INSTRUCTION: &'static str = "INST - ImportCall";
+    // TODO: Calls will require a big refactor in order to track
+    // the cost of the call.
+    const COST: usize = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         // Import Calls

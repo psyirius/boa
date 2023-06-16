@@ -15,6 +15,7 @@ pub(crate) struct PushDeclarativeEnvironment;
 impl Operation for PushDeclarativeEnvironment {
     const NAME: &'static str = "PushDeclarativeEnvironment";
     const INSTRUCTION: &'static str = "INST - PushDeclarativeEnvironment";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let compile_environments_index = context.vm.read::<u32>();
@@ -37,6 +38,7 @@ pub(crate) struct PushFunctionEnvironment;
 impl Operation for PushFunctionEnvironment {
     const NAME: &'static str = "PushFunctionEnvironment";
     const INSTRUCTION: &'static str = "INST - PushFunctionEnvironment";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let compile_environments_index = context.vm.read::<u32>();
@@ -61,6 +63,7 @@ pub(crate) struct PushObjectEnvironment;
 impl Operation for PushObjectEnvironment {
     const NAME: &'static str = "PushObjectEnvironment";
     const INSTRUCTION: &'static str = "INST - PushObjectEnvironment";
+    const COST: usize = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let object = context.vm.pop();
@@ -82,6 +85,7 @@ pub(crate) struct PushPrivateEnvironment;
 impl Operation for PushPrivateEnvironment {
     const NAME: &'static str = "PushPrivateEnvironment";
     const INSTRUCTION: &'static str = "INST - PushPrivateEnvironment";
+    const COST: usize = 5;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let class_value = context.vm.pop();
@@ -121,6 +125,7 @@ pub(crate) struct PopPrivateEnvironment;
 impl Operation for PopPrivateEnvironment {
     const NAME: &'static str = "PopPrivateEnvironment";
     const INSTRUCTION: &'static str = "INST - PopPrivateEnvironment";
+    const COST: usize = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         context.vm.environments.pop_private();

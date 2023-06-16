@@ -16,6 +16,7 @@ pub(crate) struct DefineClassStaticSetterByName;
 impl Operation for DefineClassStaticSetterByName {
     const NAME: &'static str = "DefineClassStaticSetterByName";
     const INSTRUCTION: &'static str = "INST - DefineClassStaticSetterByName";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -67,6 +68,7 @@ pub(crate) struct DefineClassSetterByName;
 impl Operation for DefineClassSetterByName {
     const NAME: &'static str = "DefineClassSetterByName";
     const INSTRUCTION: &'static str = "INST - DefineClassSetterByName";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -125,6 +127,7 @@ pub(crate) struct DefineClassStaticSetterByValue;
 impl Operation for DefineClassStaticSetterByValue {
     const NAME: &'static str = "DefineClassStaticSetterByValue";
     const INSTRUCTION: &'static str = "INST - DefineClassStaticSetterByValue";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let function = context.vm.pop();
@@ -177,6 +180,7 @@ pub(crate) struct DefineClassSetterByValue;
 impl Operation for DefineClassSetterByValue {
     const NAME: &'static str = "DefineClassSetterByValue";
     const INSTRUCTION: &'static str = "INST - DefineClassSetterByValue";
+    const COST: usize = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let function = context.vm.pop();
