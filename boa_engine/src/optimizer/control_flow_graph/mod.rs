@@ -450,6 +450,8 @@ pub enum Terminator {
     None,
 
     /// TODO: doc
+    //
+    // TODO: add true and false and unconditional jump.
     Jump(Opcode, RcBasicBlock),
 
     /// TODO: doc
@@ -510,7 +512,22 @@ impl BasicBlock {
     /// Insert nth instruction in the [`BasicBlock`].
     fn insert(&mut self, nth: usize, instruction: &[u8]) -> bool {
         let start = if let Some(value) = self.get(nth) {
-            value.next_opcode_pc.saturating_sub(1)
+            value.next_opcode_pc
+        } else {
+            0
+        };
+
+        for i in 0..instruction.len() {
+            self.bytecode.insert(start + i, instruction[i]);
+        }
+
+        true
+    }
+
+    /// Insert instruction in the last position in the [`BasicBlock`].
+    fn insert_last(&mut self, instruction: &[u8]) -> bool {
+        let start = if let Some(value) = BytecodeIterator::new(&self.bytecode).last() {
+            value.next_opcode_pc
         } else {
             0
         };
@@ -986,5 +1003,46 @@ impl Drop for ControlFlowGraph {
         for basic_block in &self.basic_blocks {
             *basic_block.borrow_mut() = BasicBlock::default();
         }
+    }
+}
+
+/// Simplifies the [`ControlFlowGraph`].
+///
+/// # Operations
+///
+/// - Branch to same blocks -> jump
+#[derive(Clone, Copy)]
+pub struct GraphSimplification;
+
+impl GraphSimplification {
+    /// TODO: doc
+    pub fn perform(graph: &mut ControlFlowGraph) -> bool {
+        let mut changed = false;
+        for basic_block_ptr in &graph.basic_blocks {
+            {
+                let mut basic_block = basic_block_ptr.borrow_mut();
+
+                match basic_block.terminator.clone() {
+                    Terminator::None => {}
+                    Terminator::Return { .. } => {}
+                    Terminator::Jump(opcode, successor)
+                        if opcode != Opcode::Jump && opcode != Opcode::Default =>
+                    {
+                        let Some(next) = &basic_block.next else {
+                            continue;
+                        };
+
+                        if next == &successor {
+                            basic_block.insert_last(&[Opcode::Pop as u8]);
+                            basic_block.terminator = Terminator::Jump(Opcode::Jump, successor);
+
+                            changed |= true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        changed
     }
 }

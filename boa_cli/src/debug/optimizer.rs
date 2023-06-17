@@ -1,6 +1,9 @@
 use boa_engine::{
     object::{FunctionObjectBuilder, ObjectInitializer},
-    optimizer::{control_flow_graph::ControlFlowGraph, OptimizerOptions},
+    optimizer::{
+        control_flow_graph::{ControlFlowGraph, GraphSimplification},
+        OptimizerOptions,
+    },
     property::Attribute,
     Context, JsArgs, JsNativeError, JsObject, JsResult, JsValue, NativeFunction,
 };
@@ -71,8 +74,12 @@ fn graph(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<
     let bytecode = cfg.finalize();
     assert_eq!(code.bytecode(), &bytecode);
 
-    let cfg = ControlFlowGraph::generate(&bytecode);
-    println!("{:#?}", cfg);
+    let mut cfg = ControlFlowGraph::generate(&bytecode);
+    println!("Original\n{:#?}\n", cfg);
+
+    let changed = GraphSimplification::perform(&mut cfg);
+    println!("Simplified({changed}) \n{:#?}", cfg);
+
     Ok(JsValue::undefined())
 }
 
