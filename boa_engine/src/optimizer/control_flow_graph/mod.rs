@@ -1,8 +1,9 @@
 //! TODO: doc
 
 #![allow(dead_code)]
+#![allow(missing_debug_implementations)]
 
-use std::{fmt::Debug, iter::FusedIterator, mem::size_of};
+use std::{cell::RefCell, fmt::Debug, iter::FusedIterator, mem::size_of, ops::Deref, rc::Rc};
 
 use bitflags::bitflags;
 
@@ -442,38 +443,20 @@ impl<'bytecode> Iterator for BytecodeIterator<'bytecode> {
 impl FusedIterator for BytecodeIterator<'_> {}
 
 /// TODO: doc
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub enum Terminator {
     /// TODO: doc
     #[default]
     None,
+
     /// TODO: doc
-    Jump(Opcode, u32),
+    Jump(Opcode, RcBasicBlock),
 
     /// TODO: doc
     Return {
         /// Finally block that the return should jump to, if exists.
-        finally: Option<u32>,
+        finally: Option<RcBasicBlock>,
     },
-}
-
-impl Debug for Terminator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Terminator::None => write!(f, "None")?,
-            Terminator::Jump(opcode, target) => {
-                write!(f, "{} B{target}", opcode.as_str())?;
-            }
-            Terminator::Return { finally } => {
-                write!(f, "Return")?;
-                if let Some(finally) = finally {
-                    write!(f, " -- finally block B{finally}")?;
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 impl Terminator {
@@ -508,29 +491,14 @@ bitflags! {
 /// TODO: doc
 #[derive(Default, Clone)]
 pub struct BasicBlock {
-    predecessors: Vec<u32>,
+    predecessors: Vec<RcBasicBlock>,
     bytecode: Vec<u8>,
     terminator: Terminator,
+
     flags: BasicBlockFlags,
-}
 
-impl Debug for BasicBlock {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // writeln!(f, "BasicBlock")?;
-        for result in BytecodeIterator::new(&self.bytecode) {
-            writeln!(
-                f,
-                "    {:06}      {}",
-                result.current_opcode_pc,
-                result.opcode.as_str()
-            )?;
-        }
-        if !self.terminator.is_none() {
-            writeln!(f, "    Terminator: {:?}", self.terminator)?;
-        }
-
-        Ok(())
-    }
+    // TODO: maybe add previous pointer.
+    next: Option<RcBasicBlock>,
 }
 
 impl BasicBlock {
@@ -570,8 +538,81 @@ impl BasicBlock {
         true
     }
 
+    /// Remove last instruction in the [`BasicBlock`].
+    fn remove_last(&mut self) -> bool {
+        let Some(value) = BytecodeIterator::new(&self.bytecode).last() else {
+            return false;
+        };
+
+        let start = value.current_opcode_pc;
+        let length = value.next_opcode_pc - value.current_opcode_pc;
+
+        for i in 0..length {
+            self.bytecode.remove(start + i);
+        }
+
+        true
+    }
+
     fn reachable(&self) -> bool {
         self.flags.contains(BasicBlockFlags::REACHABLE)
+    }
+
+    fn successors(&self) -> Vec<RcBasicBlock> {
+        match &self.terminator {
+            Terminator::None => {
+                if let Some(next) = &self.next {
+                    return vec![next.clone()];
+                }
+                vec![]
+            }
+            Terminator::Jump(opcode, successor) => {
+                let mut successors = Vec::with_capacity(2);
+                if *opcode != Opcode::Jump && *opcode != Opcode::Default {
+                    if let Some(next) = &self.next {
+                        successors.push(next.clone());
+                    }
+                }
+
+                successors.push(successor.clone());
+                successors
+            }
+            Terminator::Return { finally } => {
+                let mut successors = Vec::with_capacity(2);
+                if let Some(next) = &self.next {
+                    successors.push(next.clone());
+                }
+                if let Some(finally) = finally {
+                    successors.push(finally.clone());
+                }
+                successors
+            }
+        }
+    }
+}
+
+/// Reference counted [`BasicBlock`] with interor mutability.
+#[derive(Default, Clone)]
+pub struct RcBasicBlock {
+    inner: Rc<RefCell<BasicBlock>>,
+}
+
+impl From<Rc<RefCell<BasicBlock>>> for RcBasicBlock {
+    fn from(inner: Rc<RefCell<BasicBlock>>) -> Self {
+        Self { inner }
+    }
+}
+
+impl Deref for RcBasicBlock {
+    type Target = Rc<RefCell<BasicBlock>>;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl PartialEq<RcBasicBlock> for RcBasicBlock {
+    fn eq(&self, other: &RcBasicBlock) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
@@ -579,29 +620,87 @@ impl BasicBlock {
 ///
 // TODO: Figure out best layout for `BasicBlock`s and
 pub struct ControlFlowGraph {
-    basic_blocks: Vec<BasicBlock>,
+    basic_block_start: RcBasicBlock,
+    basic_blocks: Vec<RcBasicBlock>,
 }
 
 impl Debug for ControlFlowGraph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "BasicBlocks:")?;
 
-        for (i, basic_block) in self.basic_blocks.iter().enumerate() {
+        let index_from_basic_block = |bb: &RcBasicBlock| {
+            for (i, basic_block) in self.basic_blocks.iter().enumerate() {
+                if basic_block == bb {
+                    return i;
+                }
+            }
+
+            unreachable!("There should be a basic block")
+        };
+
+        let mut index = 0;
+        let mut basic_block_option = Some(self.basic_block_start.clone());
+        while let Some(basic_block) = basic_block_option {
+            let basic_block = basic_block.borrow();
+
             write!(
                 f,
-                "  B{i}: -- {}reachable",
-                if basic_block.reachable() { "" } else { "NOT " }
+                "    B{index}: -- {}reachable",
+                if basic_block.reachable() { "" } else { "not " }
             )?;
+
             if !basic_block.predecessors.is_empty() {
                 write!(f, " -- predecessors ")?;
-                for r in &basic_block.predecessors {
-                    write!(f, "B{r}, ")?;
+                for predecessor in &basic_block.predecessors {
+                    let index = index_from_basic_block(predecessor);
+                    write!(f, "B{index}, ")?;
+                }
+            }
+
+            let successors = basic_block.successors();
+            if !successors.is_empty() {
+                write!(f, " -- successors ")?;
+                for successor in &successors {
+                    let index = index_from_basic_block(successor);
+                    write!(f, "B{index}, ")?;
                 }
             }
 
             writeln!(f, "")?;
 
-            writeln!(f, "{basic_block:#?}")?;
+            for result in BytecodeIterator::new(&basic_block.bytecode) {
+                writeln!(
+                    f,
+                    "        {:06}      {}",
+                    result.current_opcode_pc,
+                    result.opcode.as_str()
+                )?;
+            }
+
+            let terminator = &basic_block.terminator;
+            if !terminator.is_none() {
+                write!(f, "        Terminator: ")?;
+                match terminator {
+                    Terminator::None => write!(f, "None")?,
+                    Terminator::Jump(opcode, target) => {
+                        let target = index_from_basic_block(target);
+                        write!(f, "{} B{target}", opcode.as_str())?;
+                    }
+                    Terminator::Return { finally } => {
+                        write!(f, "Return")?;
+                        if let Some(finally) = finally {
+                            let finally = index_from_basic_block(finally);
+                            write!(f, " -- finally block B{finally}")?;
+                        }
+                    }
+                }
+                writeln!(f, "")?;
+            }
+
+            writeln!(f, "")?;
+
+            index += 1;
+            basic_block_option = basic_block.next.clone();
         }
 
         Ok(())
@@ -682,38 +781,91 @@ impl ControlFlowGraph {
         let (leaders, need_extra_block) = Self::leaders(bytecode);
         let block_count = leaders.len() + usize::from(need_extra_block);
 
-        let mut basic_blocks = Vec::new();
-        basic_blocks.resize_with(block_count, BasicBlock::default);
+        let mut basic_blocks: Vec<RcBasicBlock> = Vec::new();
+        basic_blocks.resize_with(block_count, Default::default);
+
+        let basic_block_from_bytecode_position = |address: u32| {
+            let index = leaders
+                .iter()
+                .position(|x| *x == address)
+                .expect("There should be a basic block")
+                + 1;
+
+            basic_blocks[index].clone()
+        };
+
+        let mut try_environment: Vec<(RcBasicBlock, Option<RcBasicBlock>)> = Vec::new();
 
         let mut iter = BytecodeIterator::new(bytecode);
         for (i, leader) in leaders.iter().map(|x| *x as usize).enumerate() {
             let mut bytecode = Vec::new();
             let mut terminator = Terminator::None;
             while let Some(result) = iter.next() {
-                match result.opcode {
+                let push_bytecode = match result.opcode {
                     Opcode::Return => {
-                        terminator = Terminator::Return { finally: None };
+                        let finally = try_environment
+                            .iter()
+                            .rev()
+                            .filter_map(|(_, finally)| finally.clone())
+                            .next();
+
+                        if let Some(finally) = &finally {
+                            finally
+                                .borrow_mut()
+                                .predecessors
+                                .push(basic_blocks[i].clone());
+                        }
+
+                        terminator = Terminator::Return { finally };
+
+                        false
                     }
                     opcode if is_jump_kind_opcode(opcode) => {
                         let address = result.read::<u32>(0);
-                        let basic_block_index = leaders
-                            .iter()
-                            .position(|x| *x == address)
-                            .expect("There should be a basic block")
-                            + 1;
+                        let basic_block = basic_block_from_bytecode_position(address);
 
-                        basic_blocks[basic_block_index].predecessors.push(i as u32);
+                        basic_block
+                            .borrow_mut()
+                            .predecessors
+                            .push(basic_blocks[i].clone());
 
-                        if opcode != Opcode::Jump && i + 1 != basic_blocks.len() {
-                            basic_blocks[basic_block_index]
+                        if opcode != Opcode::Jump
+                            && opcode != Opcode::Default
+                            && i + 1 != basic_blocks.len()
+                        {
+                            basic_block
+                                .borrow_mut()
                                 .predecessors
-                                .push(i as u32 + 1);
+                                .push(basic_blocks[i + 1].clone());
                         }
-                        terminator = Terminator::Jump(opcode, basic_block_index as u32);
+                        terminator = Terminator::Jump(opcode, basic_block);
+
+                        false
                     }
-                    _ => {
-                        bytecode.extend_from_slice(result.full);
+                    Opcode::TryStart => {
+                        let next_address = result.read::<u32>(0);
+                        let finally_address = result.read::<u32>(4);
+
+                        let mut finally = None;
+                        if finally_address != u32::MAX {
+                            finally = Some(basic_block_from_bytecode_position(finally_address));
+                        }
+
+                        try_environment
+                            .push((basic_block_from_bytecode_position(next_address), finally));
+
+                        true
                     }
+                    Opcode::TryEnd => {
+                        try_environment.pop();
+
+                        true
+                    }
+                    _ => true,
+                };
+
+                if push_bytecode {
+                    bytecode.extend_from_slice(result.full);
                 }
 
                 if leader == result.next_opcode_pc {
@@ -721,36 +873,55 @@ impl ControlFlowGraph {
                 }
             }
 
-            basic_blocks[i].bytecode = bytecode;
-            basic_blocks[i].terminator = terminator;
+            let mut basic_block = basic_blocks[i].borrow_mut();
+            basic_block.bytecode = bytecode;
+            basic_block.terminator = terminator;
+            basic_block.next = basic_blocks.get(i + 1).cloned();
         }
 
+        assert!(try_environment.is_empty());
+
         if let Some(last) = basic_blocks.last() {
-            if need_extra_block && last.predecessors.is_empty() {
+            if need_extra_block && last.borrow().predecessors.is_empty() {
                 basic_blocks.pop();
+
+                if let Some(last) = basic_blocks.last() {
+                    last.borrow_mut().next = None;
+                }
             }
         }
 
-        let mut sparse_index = Vec::with_capacity(block_count);
-        for i in 0..block_count {
-            sparse_index.push(i as u32);
+        Self {
+            basic_block_start: basic_blocks[0].clone(),
+            basic_blocks,
+        }
+    }
+
+    /// Remove [`BasicBlock`].
+    pub fn remove(&mut self, basic_block: &RcBasicBlock) {
+        if &self.basic_block_start == basic_block {
+            todo!()
         }
 
-        Self { basic_blocks }
-    }
+        let (predecessors, successors) = {
+            let mut basic_block = basic_block.borrow_mut();
 
-    // /// Remove nth [`BasicBlock`].
-    // pub fn remove(&mut self, nth: usize) {
-    // }
+            let successors = basic_block.successors();
+            if successors.len() > 1 {
+                basic_block.bytecode = Vec::default();
+            }
 
-    /// Get the nth [`BasicBlock`].
-    pub fn get(&self, nth: usize) -> &BasicBlock {
-        &self.basic_blocks[nth]
-    }
+            let predecessors = basic_block.predecessors.clone();
+            (predecessors, successors)
+        };
+        let successor = successors.get(0).cloned();
 
-    /// Get the nth [`BasicBlock`].
-    pub fn get_mut(&mut self, nth: usize) -> &mut BasicBlock {
-        &mut self.basic_blocks[nth]
+        for predecessor in predecessors {
+            let mut predecessor = predecessor.borrow_mut();
+            predecessor.next = successor.clone();
+        }
+
+        // if let Some() = successor.
     }
 
     /// Get [`BasicBlock`]s count in the [`ControlFlowGraph`].
@@ -760,19 +931,33 @@ impl ControlFlowGraph {
 
     /// Finalize bytecode.
     pub fn finalize(self) -> Vec<u8> {
+        let index_from_basic_block = |bb: &RcBasicBlock| {
+            for (i, basic_block) in self.basic_blocks.iter().enumerate() {
+                if Rc::ptr_eq(basic_block, bb) {
+                    return i;
+                }
+            }
+
+            unreachable!("There should be a basic block")
+        };
+
         let mut results = Vec::new();
         let mut labels = Vec::new();
         let mut blocks = Vec::with_capacity(self.basic_blocks.len());
-        for basic_block in self.basic_blocks {
+        for basic_block in &self.basic_blocks {
+            let basic_block = basic_block.borrow();
+
             blocks.push(results.len() as u32);
 
-            results.extend(basic_block.bytecode);
-            match basic_block.terminator {
+            results.extend_from_slice(&basic_block.bytecode);
+            match &basic_block.terminator {
                 Terminator::None => {}
                 Terminator::Jump(opcode, target) => {
-                    results.extend_from_slice(&[opcode as u8]);
+                    results.extend_from_slice(&[*opcode as u8]);
                     let start = results.len();
                     results.extend_from_slice(&[0, 0, 0, 0]);
+
+                    let target = index_from_basic_block(target);
                     labels.push((start as u32, target));
                 }
                 Terminator::Return { .. } => {
@@ -781,10 +966,10 @@ impl ControlFlowGraph {
             }
         }
 
-        for (label, block) in labels {
-            let block_index = blocks[block as usize];
+        for (label, block_index) in labels {
+            let address = blocks[block_index];
 
-            let bytes = block_index.to_ne_bytes();
+            let bytes = address.to_ne_bytes();
             results[label as usize] = bytes[0];
             results[label as usize + 1] = bytes[1];
             results[label as usize + 2] = bytes[2];
@@ -792,5 +977,14 @@ impl ControlFlowGraph {
         }
 
         results
+    }
+}
+
+impl Drop for ControlFlowGraph {
+    fn drop(&mut self) {
+        // NOTE: Untie BasicBlock nodes, so they can be deallocated.
+        for basic_block in &self.basic_blocks {
+            *basic_block.borrow_mut() = BasicBlock::default();
+        }
     }
 }
