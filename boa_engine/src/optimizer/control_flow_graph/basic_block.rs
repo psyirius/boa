@@ -110,6 +110,9 @@ impl BasicBlock {
             Terminator::JumpConditional { no, yes, .. } => {
                 vec![no.clone(), yes.clone()]
             }
+            Terminator::TemplateLookup { no, yes, .. } => {
+                vec![no.clone(), yes.clone()]
+            }
             Terminator::Return { finally } => {
                 let mut successors = Vec::new();
                 if let Some(finally) = finally {
@@ -127,6 +130,10 @@ impl BasicBlock {
                 nexts.push(target.clone());
             }
             Terminator::JumpConditional { no, yes, .. } => {
+                nexts.push(no.clone());
+                nexts.push(yes.clone());
+            }
+            Terminator::TemplateLookup { no, yes, .. } => {
                 nexts.push(no.clone());
                 nexts.push(yes.clone());
             }

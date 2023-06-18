@@ -42,6 +42,18 @@ pub enum Terminator {
     },
 
     /// TODO: doc
+    TemplateLookup {
+        /// TODO: doc
+        no: RcBasicBlock,
+
+        /// TODO: doc
+        yes: RcBasicBlock,
+
+        /// TODO: doc
+        site: u64,
+    },
+
+    /// TODO: doc
     Return {
         /// Finally block that the return should jump to, if exists.
         finally: Option<RcBasicBlock>,
@@ -152,6 +164,14 @@ impl Debug for ControlFlowGraph {
                         let target = index_from_basic_block(yes);
                         write!(f, "{} B{target}", opcode.as_str())?;
                     }
+                    Terminator::TemplateLookup {
+                        no: _,
+                        yes,
+                        site: _,
+                    } => {
+                        let target = index_from_basic_block(yes);
+                        write!(f, "TemplateLookup B{target}")?;
+                    }
                     Terminator::Return { finally } => {
                         write!(f, "Return")?;
                         if let Some(finally) = finally {
@@ -182,6 +202,12 @@ const fn is_jump_kind_opcode(opcode: Opcode) -> bool {
             | Opcode::JumpIfNullOrUndefined
             | Opcode::Case
             | Opcode::Default
+            | Opcode::LogicalAnd
+            | Opcode::LogicalOr
+            | Opcode::Coalesce
+            | Opcode::Break
+            | Opcode::BreakLabel
+            | Opcode::Continue
     )
 }
 
@@ -211,6 +237,10 @@ impl ControlFlowGraph {
                     leaders.push(exit);
                 }
                 Opcode::LabelledStart => {
+                    let exit = result.read::<u32>(0);
+                    leaders.push(exit);
+                }
+                Opcode::TemplateLookup => {
                     let exit = result.read::<u32>(0);
                     leaders.push(exit);
                 }
@@ -300,6 +330,23 @@ impl ControlFlowGraph {
 
                         false
                     }
+                    Opcode::TemplateLookup => {
+                        let address = result.read::<u32>(0);
+                        let site = result.read::<u64>(4);
+                        let yes = basic_block_from_bytecode_position(address);
+                        let no = basic_blocks[i + 1].clone();
+
+                        yes.borrow_mut()
+                            .predecessors
+                            .push(basic_blocks[i].downgrade());
+                        no.borrow_mut()
+                            .predecessors
+                            .push(basic_blocks[i].downgrade());
+
+                        terminator = Terminator::TemplateLookup { no, yes, site };
+
+                        false
+                    }
                     opcode if is_jump_kind_opcode(opcode) => {
                         let address = result.read::<u32>(0);
                         let yes = basic_block_from_bytecode_position(address);
@@ -308,7 +355,9 @@ impl ControlFlowGraph {
                         yes.borrow_mut()
                             .predecessors
                             .push(basic_blocks[i].downgrade());
-                        yes.borrow_mut().predecessors.push(no.downgrade());
+                        no.borrow_mut()
+                            .predecessors
+                            .push(basic_blocks[i].downgrade());
 
                         terminator = Terminator::JumpConditional { opcode, no, yes };
 
@@ -406,6 +455,15 @@ impl ControlFlowGraph {
                     results.extend_from_slice(&[*opcode as u8]);
                     let start = results.len();
                     results.extend_from_slice(&[0, 0, 0, 0]);
+
+                    let target = index_from_basic_block(yes);
+                    labels.push((start as u32, target));
+                }
+                Terminator::TemplateLookup { yes, site, .. } => {
+                    results.extend_from_slice(&[Opcode::TemplateLookup as u8]);
+                    let start = results.len();
+                    results.extend_from_slice(&[0, 0, 0, 0]);
+                    results.extend_from_slice(&site.to_ne_bytes());
 
                     let target = index_from_basic_block(yes);
                     labels.push((start as u32, target));

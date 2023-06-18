@@ -1168,7 +1168,7 @@ generate_impl! {
 
         /// Start of a finally block.
         ///
-        /// Operands:
+        /// Operands: finally_end_address: u32
         ///
         /// Stack: **=>**
         FinallyStart,
