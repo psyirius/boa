@@ -1,7 +1,9 @@
 use boa_engine::{
     object::{FunctionObjectBuilder, ObjectInitializer},
     optimizer::{
-        control_flow_graph::{ControlFlowGraph, GraphSimplification},
+        control_flow_graph::{
+            ControlFlowGraph, GraphEliminateUnreachableBasicBlocks, GraphSimplification,
+        },
         OptimizerOptions,
     },
     property::Attribute,
@@ -79,6 +81,9 @@ fn graph(_: &JsValue, args: &[JsValue], _context: &mut Context<'_>) -> JsResult<
 
     let changed = GraphSimplification::perform(&mut cfg);
     println!("Simplified({changed}) \n{:#?}", cfg);
+
+    let changed = GraphEliminateUnreachableBasicBlocks::perform(&mut cfg);
+    println!("Eliminate Unreachble({changed}) \n{:#?}", cfg);
 
     Ok(JsValue::undefined())
 }

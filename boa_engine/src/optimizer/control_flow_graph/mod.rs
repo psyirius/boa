@@ -3,444 +3,18 @@
 #![allow(dead_code)]
 #![allow(missing_debug_implementations)]
 
-use std::{cell::RefCell, fmt::Debug, iter::FusedIterator, mem::size_of, ops::Deref, rc::Rc};
+mod basic_block;
+mod instruction_iterator;
 
-use bitflags::bitflags;
+use std::{fmt::Debug, rc::Rc};
 
-use crate::vm::{code_block::Readable, Opcode};
+use indexmap::IndexSet;
+use rustc_hash::FxHashMap;
 
-struct BytecodeIteratorResult<'bytecode> {
-    current_opcode_pc: usize,
-    next_opcode_pc: usize,
-    opcode: Opcode,
-    operands: &'bytecode [u8],
-    full: &'bytecode [u8],
-}
+use crate::vm::Opcode;
 
-impl BytecodeIteratorResult<'_> {
-    /// Read type T from code.
-    ///
-    /// # Safety
-    ///
-    /// Does not check if read happens out-of-bounds.
-    pub(crate) unsafe fn read_unchecked<T>(&self, offset: usize) -> T
-    where
-        T: Readable,
-    {
-        // Safety:
-        // The function caller must ensure that the read is in bounds.
-        //
-        // This has to be an unaligned read because we can't guarantee that
-        // the types are aligned.
-        unsafe {
-            self.operands
-                .as_ptr()
-                .add(offset)
-                .cast::<T>()
-                .read_unaligned()
-        }
-    }
-
-    /// Read type T from code.
-    #[track_caller]
-    pub(crate) fn read<T>(&self, offset: usize) -> T
-    where
-        T: Readable,
-    {
-        assert!(offset + size_of::<T>() - 1 < self.operands.len());
-
-        // Safety: We checked that it is not an out-of-bounds read,
-        // so this is safe.
-        unsafe { self.read_unchecked(offset) }
-    }
-}
-
-struct BytecodeIterator<'bytecode> {
-    bytecode: &'bytecode [u8],
-    pc: usize,
-}
-
-impl<'bytecode> BytecodeIterator<'bytecode> {
-    fn new(bytecode: &'bytecode [u8]) -> Self {
-        Self { bytecode, pc: 0 }
-    }
-
-    /// Read type T from code.
-    ///
-    /// # Safety
-    ///
-    /// Does not check if read happens out-of-bounds.
-    pub(crate) unsafe fn read_unchecked<T>(&self, offset: usize) -> T
-    where
-        T: Readable,
-    {
-        // Safety:
-        // The function caller must ensure that the read is in bounds.
-        //
-        // This has to be an unaligned read because we can't guarantee that
-        // the types are aligned.
-        unsafe {
-            self.bytecode
-                .as_ptr()
-                .add(offset)
-                .cast::<T>()
-                .read_unaligned()
-        }
-    }
-
-    /// Read type T from code.
-    #[track_caller]
-    pub(crate) fn read<T>(&self, offset: usize) -> T
-    where
-        T: Readable,
-    {
-        assert!(offset + size_of::<T>() - 1 < self.bytecode.len());
-
-        // Safety: We checked that it is not an out-of-bounds read,
-        // so this is safe.
-        unsafe { self.read_unchecked(offset) }
-    }
-}
-
-impl<'bytecode> Iterator for BytecodeIterator<'bytecode> {
-    type Item = BytecodeIteratorResult<'bytecode>;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pc == self.bytecode.len() {
-            return None;
-        }
-
-        let current_opcode_pc = self.pc;
-
-        let opcode = self.bytecode[self.pc].into();
-        self.pc += size_of::<Opcode>();
-        let start_operand_byte = self.pc;
-        match opcode {
-            Opcode::SetFunctionName => {
-                let _operand = self.read::<u8>(self.pc);
-                self.pc += size_of::<u8>();
-            }
-            Opcode::RotateLeft | Opcode::RotateRight => {
-                let _operand = self.read::<u8>(self.pc);
-                self.pc += size_of::<u8>();
-            }
-            Opcode::PushInt8 => {
-                let _operand = self.read::<i8>(self.pc);
-                self.pc += size_of::<i8>();
-            }
-            Opcode::PushInt16 => {
-                let _operand = self.read::<i16>(self.pc);
-                self.pc += size_of::<i16>();
-            }
-            Opcode::PushInt32 => {
-                let _operand = self.read::<i32>(self.pc);
-                self.pc += size_of::<i32>();
-            }
-            Opcode::PushRational => {
-                let _operand = self.read::<f64>(self.pc);
-                self.pc += size_of::<f64>();
-            }
-            Opcode::PushLiteral
-            | Opcode::ThrowNewTypeError
-            | Opcode::Jump
-            | Opcode::JumpIfTrue
-            | Opcode::JumpIfFalse
-            | Opcode::JumpIfNotUndefined
-            | Opcode::JumpIfNullOrUndefined
-            | Opcode::CatchStart
-            | Opcode::FinallyStart
-            | Opcode::LabelledStart
-            | Opcode::Case
-            | Opcode::Default
-            | Opcode::LogicalAnd
-            | Opcode::LogicalOr
-            | Opcode::Coalesce
-            | Opcode::CallEval
-            | Opcode::Call
-            | Opcode::New
-            | Opcode::SuperCall
-            | Opcode::ConcatToString => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::PushDeclarativeEnvironment | Opcode::PushFunctionEnvironment => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::CopyDataProperties
-            | Opcode::Break
-            | Opcode::BreakLabel
-            | Opcode::Continue
-            | Opcode::LoopStart
-            | Opcode::IteratorLoopStart
-            | Opcode::TryStart
-            | Opcode::GeneratorDelegateNext
-            | Opcode::GeneratorDelegateResume => {
-                let _operand1 = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-                let _operand2 = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::TemplateLookup | Opcode::TemplateCreate => {
-                let _operand1 = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-                let _operand2 = self.read::<u64>(self.pc);
-                self.pc += size_of::<u64>();
-            }
-            Opcode::GetArrowFunction
-            | Opcode::GetAsyncArrowFunction
-            | Opcode::GetFunction
-            | Opcode::GetFunctionAsync => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>() + size_of::<u8>();
-            }
-            Opcode::GetGenerator | Opcode::GetGeneratorAsync => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::DefVar
-            | Opcode::DefInitVar
-            | Opcode::PutLexicalValue
-            | Opcode::GetName
-            | Opcode::GetLocator
-            | Opcode::GetNameAndLocator
-            | Opcode::GetNameOrUndefined
-            | Opcode::SetName
-            | Opcode::DeleteName
-            | Opcode::ThrowMutateImmutable => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::GetPropertyByName
-            | Opcode::GetMethod
-            | Opcode::SetPropertyByName
-            | Opcode::DefineOwnPropertyByName
-            | Opcode::DefineClassStaticMethodByName
-            | Opcode::DefineClassMethodByName
-            | Opcode::SetPropertyGetterByName
-            | Opcode::DefineClassStaticGetterByName
-            | Opcode::DefineClassGetterByName
-            | Opcode::SetPropertySetterByName
-            | Opcode::DefineClassStaticSetterByName
-            | Opcode::DefineClassSetterByName
-            | Opcode::DeletePropertyByName
-            | Opcode::SetPrivateField
-            | Opcode::DefinePrivateField
-            | Opcode::SetPrivateMethod
-            | Opcode::SetPrivateSetter
-            | Opcode::SetPrivateGetter
-            | Opcode::GetPrivateField
-            | Opcode::PushClassFieldPrivate
-            | Opcode::PushClassPrivateGetter
-            | Opcode::PushClassPrivateSetter
-            | Opcode::PushClassPrivateMethod
-            | Opcode::InPrivate => {
-                let _operand = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::PushPrivateEnvironment => {
-                let _count = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>() * (_count as usize + 1);
-            }
-            Opcode::GeneratorJumpOnResumeKind => {
-                let _normal = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-                let _throw = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-                let _return = self.read::<u32>(self.pc);
-                self.pc += size_of::<u32>();
-            }
-            Opcode::CreateIteratorResult => {
-                let _done = self.read::<u8>(self.pc) != 0;
-                self.pc += size_of::<u8>();
-            }
-            Opcode::Pop
-            | Opcode::PopIfThrown
-            | Opcode::Dup
-            | Opcode::Swap
-            | Opcode::PushZero
-            | Opcode::PushOne
-            | Opcode::PushNaN
-            | Opcode::PushPositiveInfinity
-            | Opcode::PushNegativeInfinity
-            | Opcode::PushNull
-            | Opcode::PushTrue
-            | Opcode::PushFalse
-            | Opcode::PushUndefined
-            | Opcode::PushEmptyObject
-            | Opcode::PushClassPrototype
-            | Opcode::SetClassPrototype
-            | Opcode::SetHomeObject
-            | Opcode::Add
-            | Opcode::Sub
-            | Opcode::Div
-            | Opcode::Mul
-            | Opcode::Mod
-            | Opcode::Pow
-            | Opcode::ShiftRight
-            | Opcode::ShiftLeft
-            | Opcode::UnsignedShiftRight
-            | Opcode::BitOr
-            | Opcode::BitAnd
-            | Opcode::BitXor
-            | Opcode::BitNot
-            | Opcode::In
-            | Opcode::Eq
-            | Opcode::StrictEq
-            | Opcode::NotEq
-            | Opcode::StrictNotEq
-            | Opcode::GreaterThan
-            | Opcode::GreaterThanOrEq
-            | Opcode::LessThan
-            | Opcode::LessThanOrEq
-            | Opcode::InstanceOf
-            | Opcode::TypeOf
-            | Opcode::Void
-            | Opcode::LogicalNot
-            | Opcode::Pos
-            | Opcode::Neg
-            | Opcode::Inc
-            | Opcode::IncPost
-            | Opcode::Dec
-            | Opcode::DecPost
-            | Opcode::GetPropertyByValue
-            | Opcode::GetPropertyByValuePush
-            | Opcode::SetPropertyByValue
-            | Opcode::DefineOwnPropertyByValue
-            | Opcode::DefineClassStaticMethodByValue
-            | Opcode::DefineClassMethodByValue
-            | Opcode::SetPropertyGetterByValue
-            | Opcode::DefineClassStaticGetterByValue
-            | Opcode::DefineClassGetterByValue
-            | Opcode::SetPropertySetterByValue
-            | Opcode::DefineClassStaticSetterByValue
-            | Opcode::DefineClassSetterByValue
-            | Opcode::DeletePropertyByValue
-            | Opcode::DeleteSuperThrow
-            | Opcode::ToPropertyKey
-            | Opcode::ToBoolean
-            | Opcode::Throw
-            | Opcode::TryEnd
-            | Opcode::CatchEnd
-            | Opcode::CatchEnd2
-            | Opcode::FinallyEnd
-            | Opcode::This
-            | Opcode::Super
-            | Opcode::Return
-            | Opcode::PopEnvironment
-            | Opcode::LoopEnd
-            | Opcode::LoopContinue
-            | Opcode::LoopUpdateReturnValue
-            | Opcode::LabelledEnd
-            | Opcode::CreateForInIterator
-            | Opcode::GetIterator
-            | Opcode::GetAsyncIterator
-            | Opcode::GeneratorResumeReturn
-            | Opcode::IteratorNext
-            | Opcode::IteratorFinishAsyncNext
-            | Opcode::IteratorValue
-            | Opcode::IteratorResult
-            | Opcode::IteratorDone
-            | Opcode::IteratorToArray
-            | Opcode::IteratorPop
-            | Opcode::IteratorReturn
-            | Opcode::IteratorStackEmpty
-            | Opcode::RequireObjectCoercible
-            | Opcode::ValueNotNullOrUndefined
-            | Opcode::RestParameterInit
-            | Opcode::RestParameterPop
-            | Opcode::PushValueToArray
-            | Opcode::PushElisionToArray
-            | Opcode::PushIteratorToArray
-            | Opcode::PushNewArray
-            | Opcode::PopOnReturnAdd
-            | Opcode::PopOnReturnSub
-            | Opcode::GeneratorYield
-            | Opcode::AsyncGeneratorYield
-            | Opcode::GeneratorNext
-            | Opcode::GeneratorSetReturn
-            | Opcode::PushClassField
-            | Opcode::SuperCallDerived
-            | Opcode::Await
-            | Opcode::NewTarget
-            | Opcode::ImportMeta
-            | Opcode::SuperCallPrepare
-            | Opcode::CallEvalSpread
-            | Opcode::CallSpread
-            | Opcode::NewSpread
-            | Opcode::SuperCallSpread
-            | Opcode::SetPrototype
-            | Opcode::PushObjectEnvironment
-            | Opcode::IsObject
-            | Opcode::SetNameByLocator
-            | Opcode::PopPrivateEnvironment
-            | Opcode::ImportCall
-            | Opcode::Nop => {}
-            Opcode::Reserved1
-            | Opcode::Reserved2
-            | Opcode::Reserved3
-            | Opcode::Reserved4
-            | Opcode::Reserved5
-            | Opcode::Reserved6
-            | Opcode::Reserved7
-            | Opcode::Reserved8
-            | Opcode::Reserved9
-            | Opcode::Reserved10
-            | Opcode::Reserved11
-            | Opcode::Reserved12
-            | Opcode::Reserved13
-            | Opcode::Reserved14
-            | Opcode::Reserved15
-            | Opcode::Reserved16
-            | Opcode::Reserved17
-            | Opcode::Reserved18
-            | Opcode::Reserved19
-            | Opcode::Reserved20
-            | Opcode::Reserved21
-            | Opcode::Reserved22
-            | Opcode::Reserved23
-            | Opcode::Reserved24
-            | Opcode::Reserved25
-            | Opcode::Reserved26
-            | Opcode::Reserved27
-            | Opcode::Reserved28
-            | Opcode::Reserved29
-            | Opcode::Reserved30
-            | Opcode::Reserved31
-            | Opcode::Reserved32
-            | Opcode::Reserved33
-            | Opcode::Reserved34
-            | Opcode::Reserved35
-            | Opcode::Reserved36
-            | Opcode::Reserved37
-            | Opcode::Reserved38
-            | Opcode::Reserved39
-            | Opcode::Reserved40
-            | Opcode::Reserved41
-            | Opcode::Reserved42
-            | Opcode::Reserved43
-            | Opcode::Reserved44
-            | Opcode::Reserved45
-            | Opcode::Reserved46
-            | Opcode::Reserved47
-            | Opcode::Reserved48
-            | Opcode::Reserved49
-            | Opcode::Reserved50
-            | Opcode::Reserved51 => unreachable!("Reserved opcodes are unrechable"),
-        }
-
-        let end_operand_byte = self.pc;
-
-        Some(BytecodeIteratorResult {
-            current_opcode_pc,
-            next_opcode_pc: self.pc,
-            opcode,
-            operands: &self.bytecode[start_operand_byte..end_operand_byte],
-            full: &self.bytecode[current_opcode_pc..end_operand_byte],
-        })
-    }
-}
-
-impl FusedIterator for BytecodeIterator<'_> {}
+pub use self::basic_block::{BasicBlock, RcBasicBlock, WeakBasicBlock};
+use self::{basic_block::BasicBlockFlags, instruction_iterator::InstructionIterator};
 
 /// TODO: doc
 #[derive(Default, Clone)]
@@ -450,9 +24,22 @@ pub enum Terminator {
     None,
 
     /// TODO: doc
-    //
-    // TODO: add true and false and unconditional jump.
-    Jump(Opcode, RcBasicBlock),
+    JumpUnconditional {
+        /// TODO: doc
+        opcode: Opcode,
+        /// TODO: doc
+        target: RcBasicBlock,
+    },
+
+    /// TODO: doc
+    JumpConditional {
+        /// TODO: doc
+        opcode: Opcode,
+        /// TODO: doc
+        no: RcBasicBlock,
+        /// TODO: doc
+        yes: RcBasicBlock,
+    },
 
     /// TODO: doc
     Return {
@@ -469,182 +56,34 @@ impl Terminator {
 
     /// Check if [`Terminator::Jump`].
     pub fn is_jump(&self) -> bool {
-        matches!(self, Terminator::Jump(_, _))
+        matches!(
+            self,
+            Terminator::JumpUnconditional { .. } | Terminator::JumpConditional { .. }
+        )
     }
 
     /// Check if unconditional [`Terminator::Jump`].
     pub fn is_unconditional_jump(&self) -> bool {
-        matches!(self, Terminator::Jump(Opcode::Jump | Opcode::Default, _))
+        matches!(self, Terminator::JumpUnconditional { .. })
     }
 
     /// Check if conditional [`Terminator::Jump`].
     pub fn is_conditional_jump(&self) -> bool {
-        matches!(self, Terminator::Jump(opcode, _) if *opcode != Opcode::Jump)
-    }
-}
-
-bitflags! {
-    #[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
-    struct BasicBlockFlags: u8 {
-        const REACHABLE = 0b0000_0001;
+        matches!(self, Terminator::JumpConditional { .. })
     }
 }
 
 /// TODO: doc
-#[derive(Default, Clone)]
-pub struct BasicBlock {
-    predecessors: Vec<RcBasicBlock>,
-    bytecode: Vec<u8>,
-    terminator: Terminator,
-
-    flags: BasicBlockFlags,
-
-    // TODO: maybe add previous pointer.
-    next: Option<RcBasicBlock>,
-}
-
-impl BasicBlock {
-    /// Get nth instruction in the [`BasicBlock`].
-    fn get(&mut self, nth: usize) -> Option<BytecodeIteratorResult<'_>> {
-        BytecodeIterator::new(&self.bytecode).nth(nth)
-    }
-
-    /// Insert nth instruction in the [`BasicBlock`].
-    fn insert(&mut self, nth: usize, instruction: &[u8]) -> bool {
-        let start = if let Some(value) = self.get(nth) {
-            value.next_opcode_pc
-        } else {
-            0
-        };
-
-        for i in 0..instruction.len() {
-            self.bytecode.insert(start + i, instruction[i]);
-        }
-
-        true
-    }
-
-    /// Insert instruction in the last position in the [`BasicBlock`].
-    fn insert_last(&mut self, instruction: &[u8]) -> bool {
-        let start = if let Some(value) = BytecodeIterator::new(&self.bytecode).last() {
-            value.next_opcode_pc
-        } else {
-            0
-        };
-
-        for i in 0..instruction.len() {
-            self.bytecode.insert(start + i, instruction[i]);
-        }
-
-        true
-    }
-
-    /// Remove nth instruction in the [`BasicBlock`].
-    fn remove(&mut self, nth: usize) -> bool {
-        let Some(value) = self.get(nth) else {
-            return false;
-        };
-
-        let start = value.current_opcode_pc;
-        let length = value.next_opcode_pc - value.current_opcode_pc;
-
-        for i in 0..length {
-            self.bytecode.remove(start + i);
-        }
-
-        true
-    }
-
-    /// Remove last instruction in the [`BasicBlock`].
-    fn remove_last(&mut self) -> bool {
-        let Some(value) = BytecodeIterator::new(&self.bytecode).last() else {
-            return false;
-        };
-
-        let start = value.current_opcode_pc;
-        let length = value.next_opcode_pc - value.current_opcode_pc;
-
-        for i in 0..length {
-            self.bytecode.remove(start + i);
-        }
-
-        true
-    }
-
-    fn reachable(&self) -> bool {
-        self.flags.contains(BasicBlockFlags::REACHABLE)
-    }
-
-    fn successors(&self) -> Vec<RcBasicBlock> {
-        match &self.terminator {
-            Terminator::None => {
-                if let Some(next) = &self.next {
-                    return vec![next.clone()];
-                }
-                vec![]
-            }
-            Terminator::Jump(opcode, successor) => {
-                let mut successors = Vec::with_capacity(2);
-                if *opcode != Opcode::Jump && *opcode != Opcode::Default {
-                    if let Some(next) = &self.next {
-                        successors.push(next.clone());
-                    }
-                }
-
-                successors.push(successor.clone());
-                successors
-            }
-            Terminator::Return { finally } => {
-                let mut successors = Vec::with_capacity(2);
-                if let Some(next) = &self.next {
-                    successors.push(next.clone());
-                }
-                if let Some(finally) = finally {
-                    successors.push(finally.clone());
-                }
-                successors
-            }
-        }
-    }
-}
-
-/// Reference counted [`BasicBlock`] with interor mutability.
-#[derive(Default, Clone)]
-pub struct RcBasicBlock {
-    inner: Rc<RefCell<BasicBlock>>,
-}
-
-impl From<Rc<RefCell<BasicBlock>>> for RcBasicBlock {
-    fn from(inner: Rc<RefCell<BasicBlock>>) -> Self {
-        Self { inner }
-    }
-}
-
-impl Deref for RcBasicBlock {
-    type Target = Rc<RefCell<BasicBlock>>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl PartialEq<RcBasicBlock> for RcBasicBlock {
-    fn eq(&self, other: &RcBasicBlock) -> bool {
-        Rc::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-/// TODO: doc
-///
-// TODO: Figure out best layout for `BasicBlock`s and
 pub struct ControlFlowGraph {
     basic_block_start: RcBasicBlock,
-    basic_blocks: Vec<RcBasicBlock>,
+    basic_blocks: IndexSet<RcBasicBlock>,
 }
 
 impl Debug for ControlFlowGraph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "BasicBlocks:")?;
 
+        let mut seen = FxHashMap::default();
         let index_from_basic_block = |bb: &RcBasicBlock| {
             for (i, basic_block) in self.basic_blocks.iter().enumerate() {
                 if basic_block == bb {
@@ -656,8 +95,12 @@ impl Debug for ControlFlowGraph {
         };
 
         let mut index = 0;
-        let mut basic_block_option = Some(self.basic_block_start.clone());
-        while let Some(basic_block) = basic_block_option {
+        for basic_block in &self.basic_blocks {
+            if seen.contains_key(&basic_block.as_ptr()) {
+                continue;
+            }
+            seen.insert(basic_block.as_ptr(), index);
+
             let basic_block = basic_block.borrow();
 
             write!(
@@ -669,8 +112,10 @@ impl Debug for ControlFlowGraph {
             if !basic_block.predecessors.is_empty() {
                 write!(f, " -- predecessors ")?;
                 for predecessor in &basic_block.predecessors {
-                    let index = index_from_basic_block(predecessor);
-                    write!(f, "B{index}, ")?;
+                    if let Some(predecessor) = predecessor.upgrade() {
+                        let index = index_from_basic_block(&predecessor);
+                        write!(f, "B{index}, ")?;
+                    }
                 }
             }
 
@@ -685,7 +130,7 @@ impl Debug for ControlFlowGraph {
 
             writeln!(f, "")?;
 
-            for result in BytecodeIterator::new(&basic_block.bytecode) {
+            for result in InstructionIterator::new(&basic_block.bytecode) {
                 writeln!(
                     f,
                     "        {:06}      {}",
@@ -699,8 +144,12 @@ impl Debug for ControlFlowGraph {
                 write!(f, "        Terminator: ")?;
                 match terminator {
                     Terminator::None => write!(f, "None")?,
-                    Terminator::Jump(opcode, target) => {
+                    Terminator::JumpUnconditional { opcode, target } => {
                         let target = index_from_basic_block(target);
+                        write!(f, "{} B{target}", opcode.as_str())?;
+                    }
+                    Terminator::JumpConditional { opcode, no: _, yes } => {
+                        let target = index_from_basic_block(yes);
                         write!(f, "{} B{target}", opcode.as_str())?;
                     }
                     Terminator::Return { finally } => {
@@ -717,7 +166,6 @@ impl Debug for ControlFlowGraph {
             writeln!(f, "")?;
 
             index += 1;
-            basic_block_option = basic_block.next.clone();
         }
 
         Ok(())
@@ -742,7 +190,7 @@ impl ControlFlowGraph {
     fn leaders(bytecode: &[u8]) -> (Vec<u32>, bool) {
         let mut leaders: Vec<u32> = vec![];
 
-        for result in BytecodeIterator::new(bytecode) {
+        for result in InstructionIterator::new(bytecode) {
             match result.opcode {
                 Opcode::Return => {
                     leaders.push(result.next_opcode_pc as u32);
@@ -798,8 +246,10 @@ impl ControlFlowGraph {
         let (leaders, need_extra_block) = Self::leaders(bytecode);
         let block_count = leaders.len() + usize::from(need_extra_block);
 
-        let mut basic_blocks: Vec<RcBasicBlock> = Vec::new();
-        basic_blocks.resize_with(block_count, Default::default);
+        let mut basic_blocks = IndexSet::with_capacity(block_count);
+        for _ in 0..block_count {
+            basic_blocks.insert(RcBasicBlock::default());
+        }
 
         let basic_block_from_bytecode_position = |address: u32| {
             let index = leaders
@@ -813,7 +263,7 @@ impl ControlFlowGraph {
 
         let mut try_environment: Vec<(RcBasicBlock, Option<RcBasicBlock>)> = Vec::new();
 
-        let mut iter = BytecodeIterator::new(bytecode);
+        let mut iter = InstructionIterator::new(bytecode);
         for (i, leader) in leaders.iter().map(|x| *x as usize).enumerate() {
             let mut bytecode = Vec::new();
             let mut terminator = Terminator::None;
@@ -830,32 +280,37 @@ impl ControlFlowGraph {
                             finally
                                 .borrow_mut()
                                 .predecessors
-                                .push(basic_blocks[i].clone());
+                                .push(basic_blocks[i].downgrade());
                         }
 
                         terminator = Terminator::Return { finally };
 
                         false
                     }
-                    opcode if is_jump_kind_opcode(opcode) => {
+                    opcode @ Opcode::Jump | opcode @ Opcode::Default => {
                         let address = result.read::<u32>(0);
-                        let basic_block = basic_block_from_bytecode_position(address);
+                        let target = basic_block_from_bytecode_position(address);
 
-                        basic_block
+                        target
                             .borrow_mut()
                             .predecessors
-                            .push(basic_blocks[i].clone());
+                            .push(basic_blocks[i].downgrade());
 
-                        if opcode != Opcode::Jump
-                            && opcode != Opcode::Default
-                            && i + 1 != basic_blocks.len()
-                        {
-                            basic_block
-                                .borrow_mut()
-                                .predecessors
-                                .push(basic_blocks[i + 1].clone());
-                        }
-                        terminator = Terminator::Jump(opcode, basic_block);
+                        terminator = Terminator::JumpUnconditional { opcode, target };
+
+                        false
+                    }
+                    opcode if is_jump_kind_opcode(opcode) => {
+                        let address = result.read::<u32>(0);
+                        let yes = basic_block_from_bytecode_position(address);
+                        let no = basic_blocks[i + 1].clone();
+
+                        yes.borrow_mut()
+                            .predecessors
+                            .push(basic_blocks[i].downgrade());
+                        yes.borrow_mut().predecessors.push(no.downgrade());
+
+                        terminator = Terminator::JumpConditional { opcode, no, yes };
 
                         false
                     }
@@ -893,20 +348,9 @@ impl ControlFlowGraph {
             let mut basic_block = basic_blocks[i].borrow_mut();
             basic_block.bytecode = bytecode;
             basic_block.terminator = terminator;
-            basic_block.next = basic_blocks.get(i + 1).cloned();
         }
 
         assert!(try_environment.is_empty());
-
-        if let Some(last) = basic_blocks.last() {
-            if need_extra_block && last.borrow().predecessors.is_empty() {
-                basic_blocks.pop();
-
-                if let Some(last) = basic_blocks.last() {
-                    last.borrow_mut().next = None;
-                }
-            }
-        }
 
         Self {
             basic_block_start: basic_blocks[0].clone(),
@@ -916,34 +360,14 @@ impl ControlFlowGraph {
 
     /// Remove [`BasicBlock`].
     pub fn remove(&mut self, basic_block: &RcBasicBlock) {
-        if &self.basic_block_start == basic_block {
-            todo!()
-        }
-
-        let (predecessors, successors) = {
-            let mut basic_block = basic_block.borrow_mut();
-
-            let successors = basic_block.successors();
-            if successors.len() > 1 {
-                basic_block.bytecode = Vec::default();
-            }
-
-            let predecessors = basic_block.predecessors.clone();
-            (predecessors, successors)
-        };
-        let successor = successors.get(0).cloned();
-
-        for predecessor in predecessors {
-            let mut predecessor = predecessor.borrow_mut();
-            predecessor.next = successor.clone();
-        }
-
-        // if let Some() = successor.
+        self.basic_blocks.shift_remove(basic_block);
     }
 
-    /// Get [`BasicBlock`]s count in the [`ControlFlowGraph`].
-    pub fn basic_blocks_len(&self) -> u32 {
-        self.basic_blocks.len() as u32
+    /// Get [`BasicBlock`] index.
+    pub fn get_index(&self, basic_block: &RcBasicBlock) -> usize {
+        self.basic_blocks
+            .get_index_of(basic_block)
+            .expect("there should be a BasicBlock in CFG")
     }
 
     /// Finalize bytecode.
@@ -961,6 +385,7 @@ impl ControlFlowGraph {
         let mut results = Vec::new();
         let mut labels = Vec::new();
         let mut blocks = Vec::with_capacity(self.basic_blocks.len());
+
         for basic_block in &self.basic_blocks {
             let basic_block = basic_block.borrow();
 
@@ -969,12 +394,20 @@ impl ControlFlowGraph {
             results.extend_from_slice(&basic_block.bytecode);
             match &basic_block.terminator {
                 Terminator::None => {}
-                Terminator::Jump(opcode, target) => {
+                Terminator::JumpUnconditional { opcode, target } => {
                     results.extend_from_slice(&[*opcode as u8]);
                     let start = results.len();
                     results.extend_from_slice(&[0, 0, 0, 0]);
 
                     let target = index_from_basic_block(target);
+                    labels.push((start as u32, target));
+                }
+                Terminator::JumpConditional { opcode, no: _, yes } => {
+                    results.extend_from_slice(&[*opcode as u8]);
+                    let start = results.len();
+                    results.extend_from_slice(&[0, 0, 0, 0]);
+
+                    let target = index_from_basic_block(yes);
                     labels.push((start as u32, target));
                 }
                 Terminator::Return { .. } => {
@@ -1011,6 +444,7 @@ impl Drop for ControlFlowGraph {
 /// # Operations
 ///
 /// - Branch to same blocks -> jump
+/// - Unrachable block elimination
 #[derive(Clone, Copy)]
 pub struct GraphSimplification;
 
@@ -1025,16 +459,13 @@ impl GraphSimplification {
                 match basic_block.terminator.clone() {
                     Terminator::None => {}
                     Terminator::Return { .. } => {}
-                    Terminator::Jump(opcode, successor)
-                        if opcode != Opcode::Jump && opcode != Opcode::Default =>
-                    {
-                        let Some(next) = &basic_block.next else {
-                            continue;
-                        };
-
-                        if next == &successor {
+                    Terminator::JumpConditional { no, yes, .. } => {
+                        if no == yes {
                             basic_block.insert_last(&[Opcode::Pop as u8]);
-                            basic_block.terminator = Terminator::Jump(Opcode::Jump, successor);
+                            basic_block.terminator = Terminator::JumpUnconditional {
+                                opcode: Opcode::Jump,
+                                target: yes,
+                            };
 
                             changed |= true;
                         }
@@ -1043,6 +474,63 @@ impl GraphSimplification {
                 }
             }
         }
+        changed
+    }
+}
+
+/// TODO: doc
+#[derive(Clone, Copy)]
+pub struct GraphEliminateUnreachableBasicBlocks;
+
+impl GraphEliminateUnreachableBasicBlocks {
+    /// TODO: doc
+    pub fn perform(graph: &mut ControlFlowGraph) -> bool {
+        let mut changed = false;
+
+        let mut stack = vec![graph.basic_block_start.clone()];
+        while let Some(basic_block_ptr) = stack.pop() {
+            let mut basic_block = basic_block_ptr.borrow_mut();
+            if basic_block.reachable() {
+                break;
+            }
+            basic_block.flags |= BasicBlockFlags::REACHABLE;
+            basic_block.next(&mut stack);
+
+            // println!("{:p} -- {}", basic_block_ptr.as_ptr(), basic_block.reachable());
+        }
+
+        assert!(
+            graph.basic_block_start.borrow().reachable(),
+            "start basic block node should always be reachable"
+        );
+
+        let mut delete_list = Vec::new();
+        for (i, basic_block) in graph.basic_blocks.iter().enumerate().rev() {
+            if !basic_block.borrow().reachable() {
+                delete_list.push(i);
+            }
+        }
+
+        // println!("{delete_list:?}");
+
+        for i in delete_list {
+            let basic_block = graph
+                .basic_blocks
+                .shift_remove_index(i)
+                .expect("there should be a BasicBlock in CFG");
+            let mut basic_block = basic_block.borrow_mut();
+
+            assert!(
+                !basic_block.reachable(),
+                "reachable basic blocks should not be eliminated"
+            );
+
+            basic_block.predecessors.clear();
+            basic_block.terminator = Terminator::None;
+
+            changed |= true;
+        }
+
         changed
     }
 }
