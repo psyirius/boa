@@ -26,7 +26,7 @@ pub(crate) struct TypeOf;
 impl Operation for TypeOf {
     const NAME: &'static str = "TypeOf";
     const INSTRUCTION: &'static str = "INST - TypeOf";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -45,7 +45,7 @@ pub(crate) struct Pos;
 impl Operation for Pos {
     const NAME: &'static str = "Pos";
     const INSTRUCTION: &'static str = "INST - Pos";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -65,7 +65,7 @@ pub(crate) struct Neg;
 impl Operation for Neg {
     const NAME: &'static str = "Neg";
     const INSTRUCTION: &'static str = "INST - Neg";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -87,7 +87,7 @@ pub(crate) struct BitNot;
 impl Operation for BitNot {
     const NAME: &'static str = "BitNot";
     const INSTRUCTION: &'static str = "INST - BitNot";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();

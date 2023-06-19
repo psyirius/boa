@@ -14,7 +14,7 @@ pub(crate) struct ConcatToString;
 impl Operation for ConcatToString {
     const NAME: &'static str = "ConcatToString";
     const INSTRUCTION: &'static str = "INST - ConcatToString";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value_count = context.vm.read::<u32>();

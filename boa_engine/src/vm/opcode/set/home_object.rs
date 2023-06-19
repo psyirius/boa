@@ -13,7 +13,7 @@ pub(crate) struct SetHomeObject;
 impl Operation for SetHomeObject {
     const NAME: &'static str = "SetHomeObject";
     const INSTRUCTION: &'static str = "INST - SetHomeObject";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let function = context.vm.pop();
@@ -45,6 +45,7 @@ pub(crate) struct SetHomeObjectClass;
 impl Operation for SetHomeObjectClass {
     const NAME: &'static str = "SetHomeObjectClass";
     const INSTRUCTION: &'static str = "INST - SetHomeObjectClass";
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let function = context.vm.pop();

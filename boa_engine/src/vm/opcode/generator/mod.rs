@@ -23,7 +23,7 @@ pub(crate) struct GeneratorNext;
 impl Operation for GeneratorNext {
     const NAME: &'static str = "GeneratorNext";
     const INSTRUCTION: &'static str = "INST - GeneratorNext";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         match context.vm.frame().generator_resume_kind {
@@ -45,7 +45,7 @@ pub(crate) struct GeneratorJumpOnResumeKind;
 impl Operation for GeneratorJumpOnResumeKind {
     const NAME: &'static str = "GeneratorJumpOnResumeKind";
     const INSTRUCTION: &'static str = "INST - GeneratorJumpOnResumeKind";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let normal = context.vm.read::<u32>();
@@ -70,7 +70,7 @@ pub(crate) struct GeneratorSetReturn;
 impl Operation for GeneratorSetReturn {
     const NAME: &'static str = "GeneratorSetReturn";
     const INSTRUCTION: &'static str = "INST - GeneratorSetReturn";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         context.vm.frame_mut().generator_resume_kind = GeneratorResumeKind::Return;
@@ -88,7 +88,7 @@ pub(crate) struct GeneratorResumeReturn;
 impl Operation for GeneratorResumeReturn {
     const NAME: &'static str = "GeneratorResumeReturn";
     const INSTRUCTION: &'static str = "INST - GeneratorResumeReturn";
-    const COST: usize = 5;
+    const COST: u8 = 5;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.frame().generator_resume_kind == GeneratorResumeKind::Throw {
@@ -108,7 +108,7 @@ pub(crate) struct GeneratorDelegateNext;
 impl Operation for GeneratorDelegateNext {
     const NAME: &'static str = "GeneratorDelegateNext";
     const INSTRUCTION: &'static str = "INST - GeneratorDelegateNext";
-    const COST: usize = 18;
+    const COST: u8 = 18;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let throw_method_undefined = context.vm.read::<u32>();
@@ -193,7 +193,7 @@ pub(crate) struct GeneratorDelegateResume;
 impl Operation for GeneratorDelegateResume {
     const NAME: &'static str = "GeneratorDelegateResume";
     const INSTRUCTION: &'static str = "INST - GeneratorDelegateResume";
-    const COST: usize = 7;
+    const COST: u8 = 7;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let return_gen = context.vm.read::<u32>();

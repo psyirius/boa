@@ -180,8 +180,9 @@ impl Context<'_> {
 
         let completion = loop {
             let completion = self.run_next_instruction(|opcode, context| {
-                total_cost = total_cost.checked_add(opcode.cost()).unwrap_or(usize::MAX);
-                total_cost += opcode.cost();
+                total_cost = total_cost
+                    .checked_add(usize::from(opcode.cost()))
+                    .unwrap_or(usize::MAX);
                 opcode.execute(context)
             });
             if let ControlFlow::Break(completion) = completion {

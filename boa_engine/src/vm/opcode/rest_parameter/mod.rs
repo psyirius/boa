@@ -14,7 +14,7 @@ pub(crate) struct RestParameterInit;
 impl Operation for RestParameterInit {
     const NAME: &'static str = "RestParameterInit";
     const INSTRUCTION: &'static str = "INST - RestParameterInit";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let arg_count = context.vm.frame().argument_count as usize;
@@ -49,7 +49,7 @@ pub(crate) struct RestParameterPop;
 impl Operation for RestParameterPop {
     const NAME: &'static str = "RestParameterPop";
     const INSTRUCTION: &'static str = "INST - RestParameterPop";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let arg_count = context.vm.frame().argument_count;

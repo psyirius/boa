@@ -13,7 +13,7 @@ pub(crate) struct Nop;
 impl Operation for Nop {
     const NAME: &'static str = "Nop";
     const INSTRUCTION: &'static str = "INST - Nop";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(_: &mut Context<'_>) -> JsResult<CompletionType> {
         Ok(CompletionType::Normal)
@@ -30,7 +30,7 @@ pub(crate) struct Reserved;
 impl Operation for Reserved {
     const NAME: &'static str = "Reserved";
     const INSTRUCTION: &'static str = "INST - Reserved";
-    const COST: usize = 0;
+    const COST: u8 = 0;
 
     fn execute(_: &mut Context<'_>) -> JsResult<CompletionType> {
         unreachable!("Reserved opcodes are unreachable!")

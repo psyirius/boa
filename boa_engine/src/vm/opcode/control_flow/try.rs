@@ -13,7 +13,7 @@ pub(crate) struct TryStart;
 impl Operation for TryStart {
     const NAME: &'static str = "TryStart";
     const INSTRUCTION: &'static str = "INST - TryStart";
-    const COST: usize = 2;
+    const COST: u8 = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let catch = context.vm.read::<u32>();
@@ -48,7 +48,7 @@ pub(crate) struct TryEnd;
 impl Operation for TryEnd {
     const NAME: &'static str = "TryEnd";
     const INSTRUCTION: &'static str = "INST - TryEnd";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let mut envs_to_pop = 0_usize;

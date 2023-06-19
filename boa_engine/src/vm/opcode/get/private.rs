@@ -13,7 +13,7 @@ pub(crate) struct GetPrivateField;
 impl Operation for GetPrivateField {
     const NAME: &'static str = "GetPrivateField";
     const INSTRUCTION: &'static str = "INST - GetPrivateField";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

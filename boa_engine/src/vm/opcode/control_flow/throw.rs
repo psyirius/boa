@@ -17,7 +17,7 @@ pub(crate) struct Throw;
 impl Operation for Throw {
     const NAME: &'static str = "Throw";
     const INSTRUCTION: &'static str = "INST - Throw";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let error = if let Some(err) = context.vm.err.take() {
@@ -196,7 +196,7 @@ pub(crate) struct ThrowNewTypeError;
 impl Operation for ThrowNewTypeError {
     const NAME: &'static str = "ThrowNewTypeError";
     const INSTRUCTION: &'static str = "INST - ThrowNewTypeError";
-    const COST: usize = 2;
+    const COST: u8 = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

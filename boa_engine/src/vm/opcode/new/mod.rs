@@ -14,7 +14,7 @@ pub(crate) struct New;
 impl Operation for New {
     const NAME: &'static str = "New";
     const INSTRUCTION: &'static str = "INST - New";
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -62,7 +62,7 @@ pub(crate) struct NewSpread;
 impl Operation for NewSpread {
     const NAME: &'static str = "NewSpread";
     const INSTRUCTION: &'static str = "INST - NewSpread";
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {

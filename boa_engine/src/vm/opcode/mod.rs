@@ -148,13 +148,13 @@ macro_rules! generate_impl {
                 Self::INSTRUCTIONS[self as usize]
             }
 
-            const COSTS: [usize; Self::MAX] = [
+            const COSTS: [u8; Self::MAX] = [
                 $(<generate_impl!(name $Variant $(=> $mapping)?)>::COST),*
             ];
 
             /// Cycle cost of this opcode.
             #[must_use]
-            pub const fn cost(self) -> usize {
+            pub const fn cost(self) -> u8 {
                 Self::COSTS[self as usize]
             }
 
@@ -178,7 +178,7 @@ macro_rules! generate_impl {
 pub(crate) trait Operation {
     const NAME: &'static str;
     const INSTRUCTION: &'static str;
-    const COST: usize;
+    const COST: u8;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType>;
 }

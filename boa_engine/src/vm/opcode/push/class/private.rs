@@ -16,7 +16,7 @@ pub(crate) struct PushClassPrivateMethod;
 impl Operation for PushClassPrivateMethod {
     const NAME: &'static str = "PushClassPrivateMethod";
     const INSTRUCTION: &'static str = "INST - PushClassPrivateMethod";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -66,7 +66,7 @@ pub(crate) struct PushClassPrivateGetter;
 impl Operation for PushClassPrivateGetter {
     const NAME: &'static str = "PushClassPrivateGetter";
     const INSTRUCTION: &'static str = "INST - PushClassPrivateGetter";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -106,7 +106,7 @@ pub(crate) struct PushClassPrivateSetter;
 impl Operation for PushClassPrivateSetter {
     const NAME: &'static str = "PushClassPrivateSetter";
     const INSTRUCTION: &'static str = "INST - PushClassPrivateSetter";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();

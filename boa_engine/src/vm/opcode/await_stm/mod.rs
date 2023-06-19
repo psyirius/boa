@@ -18,7 +18,7 @@ pub(crate) struct Await;
 impl Operation for Await {
     const NAME: &'static str = "Await";
     const INSTRUCTION: &'static str = "INST - Await";
-    const COST: usize = 5;
+    const COST: u8 = 5;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();

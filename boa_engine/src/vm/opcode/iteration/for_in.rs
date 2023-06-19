@@ -14,7 +14,7 @@ pub(crate) struct CreateForInIterator;
 impl Operation for CreateForInIterator {
     const NAME: &'static str = "CreateForInIterator";
     const INSTRUCTION: &'static str = "INST - CreateForInIterator";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let object = context.vm.pop();

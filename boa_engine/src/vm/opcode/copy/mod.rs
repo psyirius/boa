@@ -13,7 +13,7 @@ pub(crate) struct CopyDataProperties;
 impl Operation for CopyDataProperties {
     const NAME: &'static str = "CopyDataProperties";
     const INSTRUCTION: &'static str = "INST - CopyDataProperties";
-    const COST: usize = 6;
+    const COST: u8 = 6;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let excluded_key_count = context.vm.read::<u32>();

@@ -14,7 +14,7 @@ pub(crate) struct GeneratorYield;
 impl Operation for GeneratorYield {
     const NAME: &'static str = "GeneratorYield";
     const INSTRUCTION: &'static str = "INST - GeneratorYield";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         context.vm.frame_mut().r#yield = true;
@@ -32,7 +32,7 @@ pub(crate) struct AsyncGeneratorYield;
 impl Operation for AsyncGeneratorYield {
     const NAME: &'static str = "AsyncGeneratorYield";
     const INSTRUCTION: &'static str = "INST - AsyncGeneratorYield";
-    const COST: usize = 8;
+    const COST: u8 = 8;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();

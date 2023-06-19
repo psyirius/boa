@@ -20,7 +20,7 @@ pub(crate) struct NotEq;
 impl Operation for NotEq {
     const NAME: &'static str = "NotEq";
     const INSTRUCTION: &'static str = "INST - NotEq";
-    const COST: usize = 2;
+    const COST: u8 = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let rhs = context.vm.pop();
@@ -41,7 +41,7 @@ pub(crate) struct StrictEq;
 impl Operation for StrictEq {
     const NAME: &'static str = "StrictEq";
     const INSTRUCTION: &'static str = "INST - StrictEq";
-    const COST: usize = 2;
+    const COST: u8 = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let rhs = context.vm.pop();
@@ -61,7 +61,7 @@ pub(crate) struct StrictNotEq;
 impl Operation for StrictNotEq {
     const NAME: &'static str = "StrictNotEq";
     const INSTRUCTION: &'static str = "INST - StrictNotEq";
-    const COST: usize = 2;
+    const COST: u8 = 2;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let rhs = context.vm.pop();
@@ -81,7 +81,7 @@ pub(crate) struct In;
 impl Operation for In {
     const NAME: &'static str = "In";
     const INSTRUCTION: &'static str = "INST - In";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let rhs = context.vm.pop();
@@ -112,7 +112,7 @@ pub(crate) struct InPrivate;
 impl Operation for InPrivate {
     const NAME: &'static str = "InPrivate";
     const INSTRUCTION: &'static str = "INST - InPrivate";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -153,7 +153,7 @@ pub(crate) struct InstanceOf;
 impl Operation for InstanceOf {
     const NAME: &'static str = "InstanceOf";
     const INSTRUCTION: &'static str = "INST - InstanceOf";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let target = context.vm.pop();

@@ -13,7 +13,7 @@ pub(crate) struct LabelledStart;
 impl Operation for LabelledStart {
     const NAME: &'static str = "LabelledStart";
     const INSTRUCTION: &'static str = "INST - LabelledStart";
-    const COST: usize = 1;
+    const COST: u8 = 1;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let start = context.vm.frame().pc - 1;
@@ -37,7 +37,7 @@ pub(crate) struct LabelledEnd;
 impl Operation for LabelledEnd {
     const NAME: &'static str = "LabelledEnd";
     const INSTRUCTION: &'static str = "INST - LabelledEnd";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let mut envs_to_pop = 0_usize;

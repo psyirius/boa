@@ -17,7 +17,7 @@ pub(crate) struct SetPropertyByName;
 impl Operation for SetPropertyByName {
     const NAME: &'static str = "SetPropertyByName";
     const INSTRUCTION: &'static str = "INST - SetPropertyByName";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -56,7 +56,7 @@ pub(crate) struct SetPropertyByValue;
 impl Operation for SetPropertyByValue {
     const NAME: &'static str = "SetPropertyByValue";
     const INSTRUCTION: &'static str = "INST - SetPropertyByValue";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -161,7 +161,7 @@ pub(crate) struct SetPropertyGetterByName;
 impl Operation for SetPropertyGetterByName {
     const NAME: &'static str = "SetPropertyGetterByName";
     const INSTRUCTION: &'static str = "INST - SetPropertyGetterByName";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -200,7 +200,7 @@ pub(crate) struct SetPropertyGetterByValue;
 impl Operation for SetPropertyGetterByValue {
     const NAME: &'static str = "SetPropertyGetterByValue";
     const INSTRUCTION: &'static str = "INST - SetPropertyGetterByValue";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -237,7 +237,7 @@ pub(crate) struct SetPropertySetterByName;
 impl Operation for SetPropertySetterByName {
     const NAME: &'static str = "SetPropertySetterByName";
     const INSTRUCTION: &'static str = "INST - SetPropertySetterByName";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
@@ -276,7 +276,7 @@ pub(crate) struct SetPropertySetterByValue;
 impl Operation for SetPropertySetterByValue {
     const NAME: &'static str = "SetPropertySetterByValue";
     const INSTRUCTION: &'static str = "INST - SetPropertySetterByValue";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -313,7 +313,7 @@ pub(crate) struct SetFunctionName;
 impl Operation for SetFunctionName {
     const NAME: &'static str = "SetFunctionName";
     const INSTRUCTION: &'static str = "INST - SetFunctionName";
-    const COST: usize = 4;
+    const COST: u8 = 4;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let prefix = context.vm.read::<u8>();

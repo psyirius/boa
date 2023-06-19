@@ -19,7 +19,7 @@ impl Operation for CallEval {
     const INSTRUCTION: &'static str = "INST - CallEval";
     // TODO: Calls will require a big refactor in order to track
     // the cost of the call.
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -90,7 +90,7 @@ impl Operation for CallEvalSpread {
     const INSTRUCTION: &'static str = "INST - CallEvalSpread";
     // TODO: Calls will require a big refactor in order to track
     // the cost of the call.
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -167,7 +167,7 @@ impl Operation for Call {
     const INSTRUCTION: &'static str = "INST - Call";
     // TODO: Calls will require a big refactor in order to track
     // the cost of the call.
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -217,7 +217,7 @@ impl Operation for CallSpread {
     const INSTRUCTION: &'static str = "INST - CallSpread";
     // TODO: Calls will require a big refactor in order to track
     // the cost of the call.
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         if context.vm.runtime_limits.recursion_limit() <= context.vm.frames.len() {
@@ -277,7 +277,7 @@ impl Operation for ImportCall {
     const INSTRUCTION: &'static str = "INST - ImportCall";
     // TODO: Calls will require a big refactor in order to track
     // the cost of the call.
-    const COST: usize = 15;
+    const COST: u8 = 15;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         // Import Calls

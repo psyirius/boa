@@ -16,7 +16,7 @@ pub(crate) struct PushNewArray;
 impl Operation for PushNewArray {
     const NAME: &'static str = "PushNewArray";
     const INSTRUCTION: &'static str = "INST - PushNewArray";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let array = context
@@ -39,7 +39,7 @@ pub(crate) struct PushValueToArray;
 impl Operation for PushValueToArray {
     const NAME: &'static str = "PushValueToArray";
     const INSTRUCTION: &'static str = "INST - PushValueToArray";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let value = context.vm.pop();
@@ -65,7 +65,7 @@ pub(crate) struct PushElisionToArray;
 impl Operation for PushElisionToArray {
     const NAME: &'static str = "PushElisionToArray";
     const INSTRUCTION: &'static str = "INST - PushElisionToArray";
-    const COST: usize = 3;
+    const COST: u8 = 3;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let array = context.vm.pop();
@@ -91,7 +91,7 @@ pub(crate) struct PushIteratorToArray;
 impl Operation for PushIteratorToArray {
     const NAME: &'static str = "PushIteratorToArray";
     const INSTRUCTION: &'static str = "INST - PushIteratorToArray";
-    const COST: usize = 8;
+    const COST: u8 = 8;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let mut iterator = context
