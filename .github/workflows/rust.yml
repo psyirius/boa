@@ -91,6 +91,8 @@ jobs:
         run: cargo clippy --all-features --all-targets
       - name: Lint (No features)
         run: cargo clippy -p boa_engine --no-default-features --all-targets
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
       - name: Generate documentation
         run: cargo doc -v --document-private-items --all-features
       - name: Build
