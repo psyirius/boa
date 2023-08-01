@@ -210,6 +210,12 @@ impl Access<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum EnvironmentAccess {
+    Slow { index: u32 },
+    Fast { index: u32 },
+}
+
 /// The [`ByteCompiler`] is used to compile ECMAScript AST from [`boa_ast`] to bytecode.
 #[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
@@ -253,10 +259,15 @@ pub struct ByteCompiler<'ctx, 'host> {
     handlers: ThinVec<Handler>,
     literals_map: FxHashMap<Literal, u32>,
     names_map: FxHashMap<Identifier, u32>,
-    bindings_map: FxHashMap<BindingLocator, u32>,
+    bindings_map: FxHashMap<BindingLocator, EnvironmentAccess>,
     jump_info: Vec<JumpControlInfo>,
     pub(crate) in_async: bool,
     in_generator: bool,
+
+    can_optimize_local_variables: bool,
+    #[allow(dead_code)]
+    fast_local_variable_count: u32,
+    function_environment_index: Option<u32>,
 
     /// Used to handle exception throws that escape the async function types.
     ///
@@ -311,6 +322,9 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             jump_info: Vec::new(),
             in_async: false,
             in_generator: false,
+            can_optimize_local_variables: false,
+            fast_local_variable_count: 0,
+            function_environment_index: None,
             async_handler: None,
             json_parse,
             current_environment,
@@ -375,31 +389,54 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
     }
 
     #[inline]
-    pub(crate) fn get_or_insert_binding(&mut self, binding: BindingLocator) -> u32 {
+    pub(crate) fn get_or_insert_binding(&mut self, binding: BindingLocator) -> EnvironmentAccess {
         if let Some(index) = self.bindings_map.get(&binding) {
             return *index;
         }
 
+        if let Some(function_environment_index) = self.function_environment_index {
+            if !binding.is_global()
+                && self.can_optimize_local_variables
+                && function_environment_index <= binding.environment_index()
+            {
+                let index = self.fast_local_variable_count;
+                self.fast_local_variable_count += 1;
+
+                println!("Fast binding {binding:?} at {index}");
+
+                self.bindings_map
+                    .insert(binding, EnvironmentAccess::Fast { index });
+                return EnvironmentAccess::Fast { index };
+            }
+        }
+
         let index = self.bindings.len() as u32;
         self.bindings.push(binding);
-        self.bindings_map.insert(binding, index);
-        index
+        self.bindings_map
+            .insert(binding, EnvironmentAccess::Slow { index });
+        EnvironmentAccess::Slow { index }
     }
 
     fn emit_binding(&mut self, opcode: BindingOpcode, name: Identifier) {
         match opcode {
             BindingOpcode::Var => {
                 let binding = self.initialize_mutable_binding(name, true);
-                let index = self.get_or_insert_binding(binding);
-                self.emit(Opcode::DefVar, &[index]);
+                match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index: _ } => {}
+                    EnvironmentAccess::Slow { index } => self.emit(Opcode::DefVar, &[index]),
+                }
             }
             BindingOpcode::InitVar => {
                 if self.has_binding(name) {
                     match self.set_mutable_binding(name) {
-                        Ok(binding) => {
-                            let index = self.get_or_insert_binding(binding);
-                            self.emit(Opcode::DefInitVar, &[index]);
-                        }
+                        Ok(binding) => match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::DefInitVar, &[index]);
+                            }
+                        },
                         Err(BindingLocatorError::MutateImmutable) => {
                             let index = self.get_or_insert_name(name);
                             self.emit(Opcode::ThrowMutateImmutable, &[index]);
@@ -410,25 +447,37 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
                     }
                 } else {
                     let binding = self.initialize_mutable_binding(name, true);
-                    let index = self.get_or_insert_binding(binding);
-                    self.emit(Opcode::DefInitVar, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => {
+                            self.emit(Opcode::DefInitVar, &[index]);
+                        }
+                    }
                 };
             }
             BindingOpcode::InitLet => {
                 let binding = self.initialize_mutable_binding(name, false);
-                let index = self.get_or_insert_binding(binding);
-                self.emit(Opcode::PutLexicalValue, &[index]);
+                match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                    EnvironmentAccess::Slow { index } => {
+                        self.emit(Opcode::PutLexicalValue, &[index]);
+                    }
+                }
             }
             BindingOpcode::InitConst => {
                 let binding = self.initialize_immutable_binding(name);
-                let index = self.get_or_insert_binding(binding);
-                self.emit(Opcode::PutLexicalValue, &[index]);
+                match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                    EnvironmentAccess::Slow { index } => {
+                        self.emit(Opcode::PutLexicalValue, &[index]);
+                    }
+                }
             }
             BindingOpcode::SetName => match self.set_mutable_binding(name) {
-                Ok(binding) => {
-                    let index = self.get_or_insert_binding(binding);
-                    self.emit(Opcode::SetName, &[index]);
-                }
+                Ok(binding) => match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                    EnvironmentAccess::Slow { index } => self.emit(Opcode::SetName, &[index]),
+                },
                 Err(BindingLocatorError::MutateImmutable) => {
                     let index = self.get_or_insert_name(name);
                     self.emit(Opcode::ThrowMutateImmutable, &[index]);
@@ -592,8 +641,10 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         match access {
             Access::Variable { name } => {
                 let binding = self.get_binding_value(name);
-                let index = self.get_or_insert_binding(binding);
-                self.emit(Opcode::GetName, &[index]);
+                match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index } => self.emit(Opcode::GetLocal, &[index]),
+                    EnvironmentAccess::Slow { index } => self.emit(Opcode::GetName, &[index]),
+                }
             }
             Access::Property { access } => match access {
                 PropertyAccess::Simple(access) => match access.field() {
@@ -658,24 +709,33 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         match access {
             Access::Variable { name } => {
                 let binding = self.get_binding_value(name);
-                let index = self.get_or_insert_binding(binding);
                 let lex = self.current_environment.is_lex_binding(name);
 
-                if !lex {
-                    self.emit(Opcode::GetLocator, &[index]);
-                }
+                let is_fast = match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index: _ } => true,
+                    EnvironmentAccess::Slow { index } => {
+                        if !lex {
+                            self.emit(Opcode::GetLocator, &[index]);
+                        }
+                        false
+                    }
+                };
 
                 expr_fn(self, 0);
                 if use_expr {
                     self.emit(Opcode::Dup, &[]);
                 }
 
-                if lex {
+                if lex || is_fast {
                     match self.set_mutable_binding(name) {
-                        Ok(binding) => {
-                            let index = self.get_or_insert_binding(binding);
-                            self.emit(Opcode::SetName, &[index]);
-                        }
+                        Ok(binding) => match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::SetName, &[index]);
+                            }
+                        },
                         Err(BindingLocatorError::MutateImmutable) => {
                             let index = self.get_or_insert_name(name);
                             self.emit(Opcode::ThrowMutateImmutable, &[index]);
@@ -771,8 +831,10 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             },
             Access::Variable { name } => {
                 let binding = self.get_binding_value(name);
-                let index = self.get_or_insert_binding(binding);
-                self.emit(Opcode::DeleteName, &[index]);
+                match self.get_or_insert_binding(binding) {
+                    EnvironmentAccess::Fast { index: _ } => self.emit_opcode(Opcode::PushFalse),
+                    EnvironmentAccess::Slow { index } => self.emit(Opcode::DeleteName, &[index]),
+                }
             }
             Access::This => {
                 self.emit_opcode(Opcode::PushTrue);
@@ -1099,14 +1161,20 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
                     .expect("function declaration must have name");
                 if self.annex_b_function_names.contains(&name) {
                     let binding = self.get_binding_value(name);
-                    let index = self.get_or_insert_binding(binding);
-                    self.emit(Opcode::GetName, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::GetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => self.emit(Opcode::GetName, &[index]),
+                    }
 
                     match self.set_mutable_binding_var(name) {
-                        Ok(binding) => {
-                            let index = self.get_or_insert_binding(binding);
-                            self.emit(Opcode::SetName, &[index]);
-                        }
+                        Ok(binding) => match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::SetName, &[index]);
+                            }
+                        },
                         Err(BindingLocatorError::MutateImmutable) => {
                             let index = self.get_or_insert_name(name);
                             self.emit(Opcode::ThrowMutateImmutable, &[index]);
@@ -1429,6 +1497,12 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             .utf16()
             .into();
 
+        if self.can_optimize_local_variables {
+            for handler in &mut self.handlers {
+                handler.stack_count += self.fast_local_variable_count;
+            }
+        }
+
         CodeBlock {
             name,
             length: self.length,
@@ -1442,6 +1516,7 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             compile_environments: self.compile_environments.into_boxed_slice(),
             handlers: self.handlers,
             flags: Cell::new(self.code_block_flags),
+            local_variable_count: self.fast_local_variable_count,
         }
     }
 

@@ -7,7 +7,8 @@ impl ByteCompiler<'_, '_> {
         self.compile_expr(switch.val(), true);
 
         self.push_compile_environment(false);
-        let push_env = self.emit_opcode_with_operand(Opcode::PushDeclarativeEnvironment);
+        let push_env = (!self.can_optimize_local_variables)
+            .then(|| self.emit_opcode_with_operand(Opcode::PushDeclarativeEnvironment));
 
         self.block_declaration_instantiation(switch);
 
@@ -51,7 +52,10 @@ impl ByteCompiler<'_, '_> {
         self.pop_switch_control_info();
 
         let env_index = self.pop_compile_environment();
-        self.patch_jump_with_target(push_env, env_index);
-        self.emit_opcode(Opcode::PopEnvironment);
+
+        if let Some(push_env) = push_env {
+            self.patch_jump_with_target(push_env, env_index);
+            self.emit_opcode(Opcode::PopEnvironment);
+        }
     }
 }

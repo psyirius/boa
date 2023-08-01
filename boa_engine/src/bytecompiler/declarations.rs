@@ -23,6 +23,8 @@ use boa_interner::Sym;
 #[cfg(feature = "annex-b")]
 use boa_ast::operations::annex_b_function_declarations_names;
 
+use super::EnvironmentAccess;
+
 impl ByteCompiler<'_, '_> {
     /// `GlobalDeclarationInstantiation ( script, env )`
     ///
@@ -568,9 +570,15 @@ impl ByteCompiler<'_, '_> {
 
                                     // ii. Perform ! varEnv.InitializeBinding(F, undefined).
                                     let binding = self.initialize_mutable_binding(f, true);
-                                    let index = self.get_or_insert_binding(binding);
                                     self.emit_opcode(Opcode::PushUndefined);
-                                    self.emit(Opcode::DefInitVar, &[index]);
+                                    match self.get_or_insert_binding(binding) {
+                                        EnvironmentAccess::Fast { index } => {
+                                            self.emit(Opcode::SetLocal, &[index]);
+                                        }
+                                        EnvironmentAccess::Slow { index } => {
+                                            self.emit(Opcode::DefInitVar, &[index]);
+                                        }
+                                    }
                                 }
                             }
 
@@ -737,10 +745,14 @@ impl ByteCompiler<'_, '_> {
                 if binding_exists {
                     // 1. Perform ! varEnv.SetMutableBinding(fn, fo, false).
                     match self.set_mutable_binding(name) {
-                        Ok(binding) => {
-                            let index = self.get_or_insert_binding(binding);
-                            self.emit(Opcode::SetName, &[index]);
-                        }
+                        Ok(binding) => match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::SetName, &[index]);
+                            }
+                        },
                         Err(BindingLocatorError::MutateImmutable) => {
                             let index = self.get_or_insert_name(name);
                             self.emit(Opcode::ThrowMutateImmutable, &[index]);
@@ -755,8 +767,12 @@ impl ByteCompiler<'_, '_> {
                     // 3. Perform ! varEnv.InitializeBinding(fn, fo).
                     self.create_mutable_binding(name, !strict);
                     let binding = self.initialize_mutable_binding(name, !strict);
-                    let index = self.get_or_insert_binding(binding);
-                    self.emit(Opcode::DefInitVar, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => {
+                            self.emit(Opcode::DefInitVar, &[index]);
+                        }
+                    }
                 }
             }
         }
@@ -780,9 +796,13 @@ impl ByteCompiler<'_, '_> {
                     // 3. Perform ! varEnv.InitializeBinding(vn, undefined).
                     self.create_mutable_binding(name, !strict);
                     let binding = self.initialize_mutable_binding(name, !strict);
-                    let index = self.get_or_insert_binding(binding);
                     self.emit_opcode(Opcode::PushUndefined);
-                    self.emit(Opcode::DefInitVar, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => {
+                            self.emit(Opcode::DefInitVar, &[index]);
+                        }
+                    }
                 }
             }
         }
@@ -914,6 +934,7 @@ impl ByteCompiler<'_, '_> {
         // NOTE(HalidOdat): Has been moved up, so "arguments" gets registed as
         //     the first binding in the environment with index 0.
         if arguments_object_needed {
+            let function_environment_index = self.function_environment_index.take();
             // Note: This happens at runtime.
             // a. If strict is true or simpleParameterList is false, then
             //     i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
@@ -935,6 +956,13 @@ impl ByteCompiler<'_, '_> {
                 // i. Perform ! env.CreateMutableBinding("arguments", false).
                 self.create_mutable_binding(arguments, false);
             }
+
+            if self.can_optimize_local_variables {
+                let binding = self.get_binding_value(arguments);
+                self.get_or_insert_binding(binding);
+            }
+
+            self.function_environment_index = function_environment_index;
 
             self.code_block_flags |= CodeBlockFlags::NEEDS_ARGUMENTS_OBJECT;
         }
@@ -1051,15 +1079,25 @@ impl ByteCompiler<'_, '_> {
                     else {
                         // a. Let initialValue be ! env.GetBindingValue(n, false).
                         let binding = self.get_binding_value(n);
-                        let index = self.get_or_insert_binding(binding);
-                        self.emit(Opcode::GetName, &[index]);
+                        match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::GetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::GetName, &[index]);
+                            }
+                        }
                     }
 
                     // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
                     let binding = self.initialize_mutable_binding(n, true);
-                    let index = self.get_or_insert_binding(binding);
                     self.emit_opcode(Opcode::PushUndefined);
-                    self.emit(Opcode::DefInitVar, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => {
+                            self.emit(Opcode::DefInitVar, &[index]);
+                        }
+                    }
 
                     // 6. NOTE: A var with the same name as a formal parameter initially has
                     //          the same value as the corresponding initialized parameter.
@@ -1084,9 +1122,13 @@ impl ByteCompiler<'_, '_> {
 
                     // 3. Perform ! env.InitializeBinding(n, undefined).
                     let binding = self.initialize_mutable_binding(n, true);
-                    let index = self.get_or_insert_binding(binding);
                     self.emit_opcode(Opcode::PushUndefined);
-                    self.emit(Opcode::DefInitVar, &[index]);
+                    match self.get_or_insert_binding(binding) {
+                        EnvironmentAccess::Fast { index } => self.emit(Opcode::SetLocal, &[index]),
+                        EnvironmentAccess::Slow { index } => {
+                            self.emit(Opcode::DefInitVar, &[index]);
+                        }
+                    }
                 }
             }
 
@@ -1116,9 +1158,15 @@ impl ByteCompiler<'_, '_> {
 
                         // b. Perform ! varEnv.InitializeBinding(F, undefined).
                         let binding = self.initialize_mutable_binding(f, true);
-                        let index = self.get_or_insert_binding(binding);
                         self.emit_opcode(Opcode::PushUndefined);
-                        self.emit(Opcode::DefInitVar, &[index]);
+                        match self.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                self.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                self.emit(Opcode::DefInitVar, &[index]);
+                            }
+                        }
 
                         // c. Append F to instantiatedVarNames.
                         instantiated_var_names.push(f);

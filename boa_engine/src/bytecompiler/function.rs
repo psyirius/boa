@@ -123,6 +123,9 @@ impl FunctionCompiler {
         // Function environment
         compiler.push_compile_environment(true);
 
+        compiler.function_environment_index =
+            Some(compiler.current_environment.environment_index());
+
         // Taken from:
         //  - 15.9.3 Runtime Semantics: EvaluateAsyncConciseBody: <https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncconcisebody>
         //  - 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody: <https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncfunctionbody>
@@ -153,8 +156,8 @@ impl FunctionCompiler {
 
         let can_optimize_params = can_optimize_local_variables(parameters);
         let can_optimize_body = can_optimize_local_variables(body);
-        println!("Can optimize params: {can_optimize_params}");
-        println!("Can optimize body: {can_optimize_body}");
+        // println!("Can optimize params: {can_optimize_params}");
+        // println!("Can optimize body: {can_optimize_body}");
 
         let can_optimize = can_optimize_params
             && can_optimize_body
@@ -163,6 +166,9 @@ impl FunctionCompiler {
             && !parameters.has_rest_parameter()
             && parameters.is_simple();
         println!("Can optimize function: {can_optimize}");
+
+        compiler.can_optimize_local_variables =
+            can_optimize && compiler.function_environment_index.is_some();
 
         let (env_label, additional_env) = compiler.function_declaration_instantiation(
             body,

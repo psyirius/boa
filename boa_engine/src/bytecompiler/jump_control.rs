@@ -102,6 +102,10 @@ impl JumpRecord {
                     return;
                 }
                 JumpRecordAction::PopEnvironments { count } => {
+                    if compiler.can_optimize_local_variables {
+                        continue;
+                    }
+
                     for _ in 0..count {
                         compiler.emit_opcode(Opcode::PopEnvironment);
                     }

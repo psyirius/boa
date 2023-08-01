@@ -2215,4 +2215,11 @@ impl<'ast> Visitor<'ast> for CanOptimizeLocalVariables {
     fn visit_class(&mut self, _node: &'ast Class) -> ControlFlow<Self::BreakTy> {
         ControlFlow::Break(())
     }
+
+    fn visit_pattern(
+        &mut self,
+        _node: &'ast crate::pattern::Pattern,
+    ) -> ControlFlow<Self::BreakTy> {
+        ControlFlow::Break(())
+    }
 }

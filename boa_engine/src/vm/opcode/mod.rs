@@ -1672,6 +1672,20 @@ generate_impl! {
         /// Stack: **=>**
         Nop,
 
+        /// Get fast local variable.
+        ///
+        /// Operands: index: `u32`
+        ///
+        /// Stack: **=>** value
+        GetLocal,
+
+        /// Get fast local variable.
+        ///
+        /// Operands: index: `u32`
+        ///
+        /// Stack: value **=>**
+        SetLocal,
+
         /// Reserved [`Opcode`].
         Reserved1 => Reserved,
         /// Reserved [`Opcode`].
@@ -1786,10 +1800,6 @@ generate_impl! {
         Reserved56 => Reserved,
         /// Reserved [`Opcode`].
         Reserved57 => Reserved,
-        /// Reserved [`Opcode`].
-        Reserved58 => Reserved,
-        /// Reserved [`Opcode`].
-        Reserved59 => Reserved,
     }
 }
 

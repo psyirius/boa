@@ -22,7 +22,7 @@ use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 
 use crate::{
     builtins::{promise::PromiseCapability, Promise},
-    bytecompiler::{ByteCompiler, FunctionSpec},
+    bytecompiler::{ByteCompiler, EnvironmentAccess, FunctionSpec},
     environments::{BindingLocator, CompileTimeEnvironment, EnvironmentStack},
     module::ModuleKind,
     object::{FunctionObjectBuilder, JsPromise, RecursionLimiter},
@@ -1499,9 +1499,15 @@ impl SourceTextModule {
                         compiler.create_mutable_binding(name, false);
                         // 2. Perform ! env.InitializeBinding(dn, undefined).
                         let binding = compiler.initialize_mutable_binding(name, false);
-                        let index = compiler.get_or_insert_binding(binding);
                         compiler.emit_opcode(Opcode::PushUndefined);
-                        compiler.emit(Opcode::DefInitVar, &[index]);
+                        match compiler.get_or_insert_binding(binding) {
+                            EnvironmentAccess::Fast { index } => {
+                                compiler.emit(Opcode::SetLocal, &[index]);
+                            }
+                            EnvironmentAccess::Slow { index } => {
+                                compiler.emit(Opcode::DefInitVar, &[index]);
+                            }
+                        }
                         // 3. Append dn to declaredVarNames.
                         declared_var_names.push(name);
                     }

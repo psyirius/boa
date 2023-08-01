@@ -161,6 +161,8 @@ pub struct CodeBlock {
     // TODO(#3034): Maybe changing this to Gc after garbage collection would be better than Rc.
     #[unsafe_ignore_trace]
     pub(crate) compile_environments: Box<[Rc<CompileTimeEnvironment>]>,
+
+    pub(crate) local_variable_count: u32,
 }
 
 /// ---- `CodeBlock` public API ----
@@ -183,6 +185,7 @@ impl CodeBlock {
             params: FormalParameterList::default(),
             handlers: ThinVec::default(),
             compile_environments: Box::default(),
+            local_variable_count: 0,
         }
     }
 
@@ -361,7 +364,9 @@ impl CodeBlock {
             | Opcode::Call
             | Opcode::New
             | Opcode::SuperCall
-            | Opcode::ConcatToString => {
+            | Opcode::ConcatToString
+            | Opcode::GetLocal
+            | Opcode::SetLocal => {
                 let result = self.read::<u32>(*pc).to_string();
                 *pc += size_of::<u32>();
                 result
@@ -675,9 +680,7 @@ impl CodeBlock {
             | Opcode::Reserved54
             | Opcode::Reserved55
             | Opcode::Reserved56
-            | Opcode::Reserved57
-            | Opcode::Reserved58
-            | Opcode::Reserved59 => unreachable!("Reserved opcodes are unrechable"),
+            | Opcode::Reserved57 => unreachable!("Reserved opcodes are unrechable"),
         }
     }
 }
@@ -1232,6 +1235,7 @@ impl JsObject {
 
         let argument_count = args.len();
         let parameters_count = code.params.as_ref().len();
+        let local_variable_count = code.local_variable_count;
 
         let frame = CallFrame::new(code)
             .with_argument_count(argument_count as u32)
@@ -1240,6 +1244,10 @@ impl JsObject {
         std::mem::swap(&mut context.vm.active_runnable, &mut script_or_module);
 
         context.vm.push_frame(frame);
+
+        for _ in 0..local_variable_count {
+            context.vm.push(JsValue::undefined());
+        }
 
         // Push function arguments to the stack.
         for _ in argument_count..parameters_count {
@@ -1429,6 +1437,7 @@ impl JsObject {
 
                 let argument_count = args.len();
                 let parameters_count = code.params.as_ref().len();
+                let local_variable_count = code.local_variable_count;
 
                 let has_binding_identifier = code.has_binding_identifier();
 
@@ -1439,6 +1448,10 @@ impl JsObject {
                         .with_argument_count(argument_count as u32)
                         .with_env_fp(environments_len as u32),
                 );
+
+                for _ in 0..local_variable_count {
+                    context.vm.push(JsValue::undefined());
+                }
 
                 // Push function arguments to the stack.
                 for _ in argument_count..parameters_count {
