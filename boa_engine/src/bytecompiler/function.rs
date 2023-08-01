@@ -7,7 +7,10 @@ use crate::{
     vm::{CodeBlock, CodeBlockFlags, Opcode},
     Context,
 };
-use boa_ast::function::{FormalParameterList, FunctionBody};
+use boa_ast::{
+    function::{FormalParameterList, FunctionBody},
+    operations::can_optimize_local_variables,
+};
 use boa_gc::Gc;
 use boa_interner::Sym;
 
@@ -147,6 +150,19 @@ impl FunctionCompiler {
             // Patched in `ByteCompiler::finish()`.
             compiler.async_handler = Some(compiler.push_handler());
         }
+
+        let can_optimize_params = can_optimize_local_variables(parameters);
+        let can_optimize_body = can_optimize_local_variables(body);
+        println!("Can optimize params: {can_optimize_params}");
+        println!("Can optimize body: {can_optimize_body}");
+
+        let can_optimize = can_optimize_params
+            && can_optimize_body
+            && !parameters.has_arguments()
+            && !parameters.has_duplicates()
+            && !parameters.has_rest_parameter()
+            && parameters.is_simple();
+        println!("Can optimize function: {can_optimize}");
 
         let (env_label, additional_env) = compiler.function_declaration_instantiation(
             body,
