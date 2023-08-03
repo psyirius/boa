@@ -18,6 +18,7 @@ mod generator;
 mod get;
 mod iteration;
 mod meta;
+mod modifier;
 mod new;
 mod nop;
 mod pop;
@@ -59,6 +60,8 @@ pub(crate) use get::*;
 pub(crate) use iteration::*;
 #[doc(inline)]
 pub(crate) use meta::*;
+#[doc(inline)]
+pub(crate) use modifier::*;
 #[doc(inline)]
 pub(crate) use new::*;
 #[doc(inline)]
@@ -121,16 +124,79 @@ where
     unsafe { read_unchecked(bytes, offset) }
 }
 
+/// Represents a varying operand kind.
+#[derive(Default, Debug, Clone, Copy)]
+#[allow(missing_docs)]
+pub enum VaryingOperandKind {
+    #[default]
+    Short,
+    Wide,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[allow(missing_docs)]
+pub struct VaryingOperand {
+    kind: VaryingOperandKind,
+    value: u32,
+}
+
+impl PartialEq for VaryingOperand {
+    fn eq(&self, other: &Self) -> bool {
+        self.value == other.value
+    }
+}
+
+#[allow(missing_docs)]
+impl VaryingOperand {
+    #[must_use]
+    pub fn short(value: u8) -> Self {
+        Self {
+            kind: VaryingOperandKind::Short,
+            value: u32::from(value),
+        }
+    }
+    #[must_use]
+    pub const fn wide(value: u32) -> Self {
+        Self {
+            kind: VaryingOperandKind::Wide,
+            value,
+        }
+    }
+    #[must_use]
+    pub const fn value(self) -> u32 {
+        self.value
+    }
+    #[must_use]
+    pub const fn kind(self) -> VaryingOperandKind {
+        self.kind
+    }
+}
+
 trait BytecodeConversion: Sized {
     fn to_bytecode(&self, bytes: &mut Vec<u8>);
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self;
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, varying_kind: VaryingOperandKind) -> Self;
+}
+
+impl BytecodeConversion for VaryingOperand {
+    fn to_bytecode(&self, bytes: &mut Vec<u8>) {
+        match self.kind() {
+            VaryingOperandKind::Short => u8::to_bytecode(&(self.value() as u8), bytes),
+            VaryingOperandKind::Wide => u32::to_bytecode(&self.value(), bytes),
+        }
+    }
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, varying_kind: VaryingOperandKind) -> Self {
+        match varying_kind {
+            VaryingOperandKind::Short => Self::short(u8::from_bytecode(bytes, pc, varying_kind)),
+            VaryingOperandKind::Wide => Self::wide(u32::from_bytecode(bytes, pc, varying_kind)),
+        }
+    }
 }
 
 impl BytecodeConversion for GeneratorResumeKind {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.push(*self as u8);
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<u8>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         JsValue::from(value).to_generator_resume_kind()
@@ -141,7 +207,7 @@ impl BytecodeConversion for bool {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.push(u8::from(*self));
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<u8>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value != 0
@@ -152,7 +218,7 @@ impl BytecodeConversion for i8 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.push(*self as u8);
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -163,7 +229,7 @@ impl BytecodeConversion for u8 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.push(*self);
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -174,7 +240,7 @@ impl BytecodeConversion for i16 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -185,7 +251,7 @@ impl BytecodeConversion for u16 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -196,7 +262,7 @@ impl BytecodeConversion for i32 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -207,7 +273,7 @@ impl BytecodeConversion for u32 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -218,7 +284,7 @@ impl BytecodeConversion for i64 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -229,7 +295,7 @@ impl BytecodeConversion for u64 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -240,7 +306,7 @@ impl BytecodeConversion for f32 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -251,7 +317,7 @@ impl BytecodeConversion for f64 {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         bytes.extend_from_slice(&self.to_ne_bytes());
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let value = read::<Self>(bytes, *pc);
         *pc += std::mem::size_of::<Self>();
         value
@@ -265,7 +331,7 @@ impl BytecodeConversion for ThinVec<u32> {
             bytes.extend_from_slice(&item.to_ne_bytes());
         }
     }
-    fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+    fn from_bytecode(bytes: &[u8], pc: &mut usize, _varying_kind: VaryingOperandKind) -> Self {
         let count = read::<u32>(bytes, *pc);
         *pc += std::mem::size_of::<u32>();
         let mut result = Self::with_capacity(count as usize);
@@ -323,9 +389,10 @@ macro_rules! generate_opcodes {
         }
 
         impl Opcode {
-            const MAX: usize = 2usize.pow(8);
+            const MAX: usize = 2usize.pow(8) * 2;
 
             const NAMES: [&'static str; Self::MAX] = [
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::NAME),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::NAME),*
             ];
 
@@ -336,6 +403,7 @@ macro_rules! generate_opcodes {
             }
 
             const INSTRUCTIONS: [&'static str; Self::MAX] = [
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::INSTRUCTION),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::INSTRUCTION),*
             ];
 
@@ -346,7 +414,8 @@ macro_rules! generate_opcodes {
             }
 
             const EXECUTE_FNS: [fn(&mut Context<'_>) -> JsResult<CompletionType>; Self::MAX] = [
-                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::execute),*
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::execute),*,
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::wide_execute),*
             ];
 
             pub(super) fn execute(self, context: &mut Context<'_>) -> JsResult<CompletionType> {
@@ -395,7 +464,7 @@ macro_rules! generate_opcodes {
             /// If the provided bytecode is not valid.
             #[inline]
             #[must_use]
-            pub fn from_bytecode(bytes: &[u8], pc: &mut usize) -> Self {
+            pub fn from_bytecode(bytes: &[u8], pc: &mut usize, varying_kind: VaryingOperandKind) -> Self {
                 let opcode = bytes[*pc].into();
                 *pc += 1;
                 match opcode {
@@ -406,7 +475,7 @@ macro_rules! generate_opcodes {
                                     $({
                                         Self::$Variant {
                                             $(
-                                                $FieldName: BytecodeConversion::from_bytecode(bytes, pc)
+                                                $FieldName: BytecodeConversion::from_bytecode(bytes, pc, varying_kind)
                                             ),*
                                         }
                                     })?
@@ -444,6 +513,10 @@ pub(crate) trait Operation {
     const INSTRUCTION: &'static str;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType>;
+
+    fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        Reserved::wide_execute(context)
+    }
 }
 
 generate_opcodes! {
@@ -594,7 +667,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: **=>** (`literals[index]`)
-    PushLiteral { index: u32 },
+    PushLiteral { index: VaryingOperand },
 
     /// Push empty object `{}` value on the stack.
     ///
@@ -769,7 +842,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: rhs **=>** (private_name `in` rhs)
-    InPrivate { index: u32 },
+    InPrivate { index: VaryingOperand },
 
     /// Binary `==` operator.
     ///
@@ -930,42 +1003,42 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: **=>**
-    DefVar { index: u32 },
+    DefVar { index: VaryingOperand },
 
     /// Declare and initialize `var` type variable.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: value **=>**
-    DefInitVar { index: u32 },
+    DefInitVar { index: VaryingOperand },
 
     /// Initialize a lexical binding.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: value **=>**
-    PutLexicalValue { index: u32 },
+    PutLexicalValue { index: VaryingOperand },
 
     /// Throws an error because the binding access is illegal.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: **=>**
-    ThrowMutateImmutable { index: u32 },
+    ThrowMutateImmutable { index: VaryingOperand },
 
     /// Find a binding on the environment chain and push its value.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: **=>** value
-    GetName { index: u32 },
+    GetName { index: VaryingOperand },
 
     /// Find a binding on the environment and set the `current_binding` of the current frame.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: **=>**
-    GetLocator { index: u32 },
+    GetLocator { index: VaryingOperand },
 
     /// Find a binding on the environment chain and push its value to the stack and its
     /// `BindingLocator` to the `bindings_stack`.
@@ -973,21 +1046,21 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: **=>** value
-    GetNameAndLocator { index: u32 },
+    GetNameAndLocator { index: VaryingOperand },
 
     /// Find a binding on the environment chain and push its value. If the binding does not exist push undefined.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: **=>** value
-    GetNameOrUndefined { index: u32 },
+    GetNameOrUndefined { index: VaryingOperand },
 
     /// Find a binding on the environment chain and assign its value.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: value **=>**
-    SetName { index: u32 },
+    SetName { index: VaryingOperand },
 
     /// Assigns a value to the binding pointed by the top of the `bindings_stack`.
     ///
@@ -999,7 +1072,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: **=>** deleted
-    DeleteName { index: u32 },
+    DeleteName { index: VaryingOperand },
 
     /// Get a property by name from an object an push it on the stack.
     ///
@@ -1008,15 +1081,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, receiver **=>** value
-    GetPropertyByName { index: u32 },
-
-    /// Get a property method or undefined if the property is null or undefined.
-    ///
-    /// Throws if the method is not a callable object.
-    ///
-    /// Operands: index: `u32`
-    /// Stack: object **=>** object, method
-    GetMethod { index: u32 },
+    GetPropertyByName { index: VaryingOperand },
 
     /// Get a property by value from an object an push it on the stack.
     ///
@@ -1043,7 +1108,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, receiver, value **=>** value
-    SetPropertyByName { index: u32 },
+    SetPropertyByName { index: VaryingOperand },
 
     /// Sets the name of a function object.
     ///
@@ -1066,21 +1131,21 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    DefineOwnPropertyByName { index: u32 },
+    DefineOwnPropertyByName { index: VaryingOperand },
 
     /// Defines a static class method by name.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: class, function **=>**
-    DefineClassStaticMethodByName { index: u32 },
+    DefineClassStaticMethodByName { index: VaryingOperand },
 
     /// Defines a class method by name.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: class_proto, function **=>**
-    DefineClassMethodByName { index: u32 },
+    DefineClassMethodByName { index: VaryingOperand },
 
     /// Sets a property by value of an object.
     ///
@@ -1119,7 +1184,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    SetPropertyGetterByName { index: u32 },
+    SetPropertyGetterByName { index: VaryingOperand },
 
     /// Defines a static getter class method by name.
     ///
@@ -1128,7 +1193,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: class, binding_function **=>**
-    DefineClassStaticGetterByName { index: u32 },
+    DefineClassStaticGetterByName { index: VaryingOperand },
 
     /// Defines a getter class method by name.
     ///
@@ -1137,7 +1202,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: class_proto, function **=>** class
-    DefineClassGetterByName { index: u32 },
+    DefineClassGetterByName { index: VaryingOperand },
 
     /// Sets a getter property by value of an object.
     ///
@@ -1173,7 +1238,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    SetPropertySetterByName { index: u32 },
+    SetPropertySetterByName { index: VaryingOperand },
 
     /// Defines a static setter class method by name.
     ///
@@ -1182,7 +1247,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: class, function **=>**
-    DefineClassStaticSetterByName { index: u32 },
+    DefineClassStaticSetterByName { index: VaryingOperand },
 
     /// Defines a setter class method by name.
     ///
@@ -1191,7 +1256,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: class_proto, function **=>**
-    DefineClassSetterByName { index: u32 },
+    DefineClassSetterByName { index: VaryingOperand },
 
     /// Sets a setter property by value of an object.
     ///
@@ -1227,7 +1292,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>** value
-    SetPrivateField { index: u32 },
+    SetPrivateField { index: VaryingOperand },
 
     /// Define a private property of a class constructor by it's name.
     ///
@@ -1236,7 +1301,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    DefinePrivateField { index: u32 },
+    DefinePrivateField { index: VaryingOperand },
 
     /// Set a private method of a class constructor by it's name.
     ///
@@ -1245,7 +1310,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    SetPrivateMethod { index: u32 },
+    SetPrivateMethod { index: VaryingOperand },
 
     /// Set a private setter property of a class constructor by it's name.
     ///
@@ -1254,7 +1319,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    SetPrivateSetter { index: u32 },
+    SetPrivateSetter { index: VaryingOperand },
 
     /// Set a private getter property of a class constructor by it's name.
     ///
@@ -1263,7 +1328,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object, value **=>**
-    SetPrivateGetter { index: u32 },
+    SetPrivateGetter { index: VaryingOperand },
 
     /// Get a private property by name from an object an push it on the stack.
     ///
@@ -1272,7 +1337,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object **=>** value
-    GetPrivateField { index: u32 },
+    GetPrivateField { index: VaryingOperand },
 
     /// Push a field to a class.
     ///
@@ -1286,28 +1351,28 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: class, field_function **=>**
-    PushClassFieldPrivate { index: u32 },
+    PushClassFieldPrivate { index: VaryingOperand },
 
     /// Push a private getter to the class.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: class, getter **=>**
-    PushClassPrivateGetter { index: u32 },
+    PushClassPrivateGetter { index: VaryingOperand },
 
     /// Push a private setter to the class.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: class, setter **=>**
-    PushClassPrivateSetter { index: u32 },
+    PushClassPrivateSetter { index: VaryingOperand },
 
     /// Push a private method to the class.
     ///
     /// Operands: index: `u32`
     ///
     /// Stack: class, method **=>**
-    PushClassPrivateMethod { index: u32 },
+    PushClassPrivateMethod { index: VaryingOperand },
 
     /// Deletes a property by name of an object.
     ///
@@ -1316,7 +1381,7 @@ generate_opcodes! {
     /// Operands: index: `u32`
     ///
     /// Stack: object **=>**
-    DeletePropertyByName { index: u32 },
+    DeletePropertyByName { index: VaryingOperand },
 
     /// Deletes a property by value of an object.
     ///
@@ -1447,7 +1512,7 @@ generate_opcodes! {
     /// Operands: message: u32
     ///
     /// Stack: **=>**
-    ThrowNewTypeError { message: u32 },
+    ThrowNewTypeError { message: VaryingOperand },
 
     /// Pops value converts it to boolean and pushes it back.
     ///
@@ -1953,6 +2018,13 @@ generate_opcodes! {
     /// Stack: **=>**
     Nop,
 
+    /// Wide modifier
+    ///
+    /// Operands: opcode and operands if any.
+    ///
+    /// Stack: **=>**
+    Wide,
+
     /// Reserved [`Opcode`].
     Reserved1 => Reserved,
     /// Reserved [`Opcode`].
@@ -2097,18 +2169,43 @@ impl<'bytecode> InstructionIterator<'bytecode> {
     pub const fn new(bytes: &'bytecode [u8]) -> Self {
         Self { bytes, pc: 0 }
     }
+
+    /// Create a new [`InstructionIterator`] from bytecode array at pc.
+    #[inline]
+    #[must_use]
+    pub const fn with_pc(bytes: &'bytecode [u8], pc: usize) -> Self {
+        Self { bytes, pc }
+    }
+
+    /// Return the current program counter.
+    #[must_use]
+    pub const fn pc(&self) -> usize {
+        self.pc
+    }
 }
 
 impl Iterator for InstructionIterator<'_> {
-    type Item = Instruction;
+    type Item = (usize, VaryingOperandKind, Instruction);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        let start_pc = self.pc;
         if self.pc >= self.bytes.len() {
             return None;
         }
 
-        Some(Instruction::from_bytecode(self.bytes, &mut self.pc))
+        let instruction =
+            Instruction::from_bytecode(self.bytes, &mut self.pc, VaryingOperandKind::Short);
+
+        if instruction == Instruction::Wide {
+            return Some((
+                start_pc,
+                VaryingOperandKind::Wide,
+                Instruction::from_bytecode(self.bytes, &mut self.pc, VaryingOperandKind::Wide),
+            ));
+        }
+
+        Some((start_pc, VaryingOperandKind::Short, instruction))
     }
 }
 

@@ -228,7 +228,7 @@ impl ByteCompiler<'_, '_> {
                         match access.field() {
                             PropertyAccessField::Const(field) => {
                                 let index = self.get_or_insert_name((*field).into());
-                                self.emit(Opcode::GetPropertyByName, &[Operand::U32(index)]);
+                                self.emit_wide(Opcode::GetPropertyByName, index);
                             }
                             PropertyAccessField::Expr(field) => {
                                 self.compile_expr(field, true);
@@ -240,7 +240,7 @@ impl ByteCompiler<'_, '_> {
                         self.compile_expr(access.target(), true);
                         self.emit(Opcode::Dup, &[]);
                         let index = self.get_or_insert_private_name(access.field());
-                        self.emit(Opcode::GetPrivateField, &[Operand::U32(index)]);
+                        self.emit_wide(Opcode::GetPrivateField, index);
                     }
                     expr => {
                         self.compile_expr(expr, true);
