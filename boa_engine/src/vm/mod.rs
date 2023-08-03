@@ -67,7 +67,6 @@ pub struct Vm {
     pub(crate) environments: EnvironmentStack,
     pub(crate) runtime_limits: RuntimeLimits,
     pub(crate) active_function: Option<JsObject>,
-    pub(crate) active_runnable: Option<ActiveRunnable>,
 
     #[cfg(feature = "trace")]
     pub(crate) trace: bool,
@@ -100,7 +99,6 @@ impl Vm {
             pending_exception: None,
             runtime_limits: RuntimeLimits::default(),
             active_function: None,
-            active_runnable: None,
             #[cfg(feature = "trace")]
             trace: false,
         }
