@@ -1081,7 +1081,7 @@ impl JsObject {
                 let constructor = *constructor;
                 drop(object);
 
-                context.vm.active_function = Some(this_function_object);
+                context.vm.native_active_function = Some(this_function_object);
 
                 let result = if constructor.is_some() {
                     function.call(&JsValue::undefined(), args, context)
@@ -1090,7 +1090,7 @@ impl JsObject {
                 }
                 .map_err(|err| err.inject_realm(context.realm().clone()));
 
-                context.vm.active_function = None;
+                context.vm.native_active_function = None;
 
                 return result;
             }
@@ -1290,7 +1290,7 @@ impl JsObject {
                 let constructor = *constructor;
                 drop(object);
 
-                context.vm.active_function = Some(this_function_object);
+                context.vm.native_active_function = Some(this_function_object);
 
                 let result = function
                     .call(this_target, args, context)
@@ -1321,7 +1321,7 @@ impl JsObject {
                         }
                     });
 
-                context.vm.active_function = None;
+                context.vm.native_active_function = None;
 
                 result
             }
