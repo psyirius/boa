@@ -84,13 +84,7 @@ impl CodeBlock {
                     graph.add_node(previous_pc, NodeShape::None, label.into(), Color::None);
                     graph.add_edge(previous_pc, pc, None, Color::None, EdgeStyle::Line);
                 }
-                Opcode::PushFloat => {
-                    pc += size_of::<f32>();
-
-                    graph.add_node(previous_pc, NodeShape::None, label.into(), Color::None);
-                    graph.add_edge(previous_pc, pc, None, Color::None, EdgeStyle::Line);
-                }
-                Opcode::PushDouble => {
+                Opcode::PushRational => {
                     pc += size_of::<f64>();
 
                     graph.add_node(previous_pc, NodeShape::None, label.into(), Color::None);
@@ -617,7 +611,8 @@ impl CodeBlock {
                 | Opcode::Reserved55
                 | Opcode::Reserved56
                 | Opcode::Reserved57
-                | Opcode::Reserved58 => unreachable!("Reserved opcodes are unrechable"),
+                | Opcode::Reserved58
+                | Opcode::Reserved59 => unreachable!("Reserved opcodes are unrechable"),
             }
         }
 

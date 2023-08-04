@@ -340,12 +340,7 @@ impl CodeBlock {
                 *pc += size_of::<i32>();
                 result
             }
-            Opcode::PushFloat => {
-                let operand = self.read::<f32>(*pc);
-                *pc += size_of::<f32>();
-                ryu_js::Buffer::new().format(operand).to_string()
-            }
-            Opcode::PushDouble => {
+            Opcode::PushRational => {
                 let operand = self.read::<f64>(*pc);
                 *pc += size_of::<f64>();
                 ryu_js::Buffer::new().format(operand).to_string()
@@ -681,7 +676,8 @@ impl CodeBlock {
             | Opcode::Reserved55
             | Opcode::Reserved56
             | Opcode::Reserved57
-            | Opcode::Reserved58 => unreachable!("Reserved opcodes are unrechable"),
+            | Opcode::Reserved58
+            | Opcode::Reserved59 => unreachable!("Reserved opcodes are unrechable"),
         }
     }
 }
