@@ -18,14 +18,14 @@ use boa_profiler::Profiler;
 use std::mem::size_of;
 
 #[cfg(feature = "trace")]
-use boa_interner::ToInternedString;
-#[cfg(feature = "trace")]
 use std::time::Instant;
 
 mod call_frame;
 mod code_block;
 mod completion_record;
 mod opcode;
+// TODO: #[cfg(feature = "trace")]
+mod vm_trace;
 
 mod runtime_limits;
 
@@ -33,6 +33,8 @@ mod runtime_limits;
 pub mod flowgraph;
 
 pub use runtime_limits::RuntimeLimits;
+
+use self::vm_trace::VmTrace;
 pub use {call_frame::CallFrame, code_block::CodeBlock, opcode::Opcode};
 
 pub(crate) use {
@@ -70,7 +72,7 @@ pub struct Vm {
     pub(crate) active_runnable: Option<ActiveRunnable>,
 
     #[cfg(feature = "trace")]
-    pub(crate) trace: bool,
+    pub(crate) trace: Option<VmTrace>,
 }
 
 /// Active runnable in the current vm context.
@@ -102,7 +104,7 @@ impl Vm {
             active_function: None,
             active_runnable: None,
             #[cfg(feature = "trace")]
-            trace: false,
+            trace: None,
         }
     }
 
@@ -203,44 +205,6 @@ pub(crate) enum CompletionType {
 
 #[cfg(feature = "trace")]
 impl Context<'_> {
-    const COLUMN_WIDTH: usize = 26;
-    const TIME_COLUMN_WIDTH: usize = Self::COLUMN_WIDTH / 2;
-    const OPCODE_COLUMN_WIDTH: usize = Self::COLUMN_WIDTH;
-    const OPERAND_COLUMN_WIDTH: usize = Self::COLUMN_WIDTH;
-    const NUMBER_OF_COLUMNS: usize = 4;
-
-    fn trace_call_frame(&self) {
-        let msg = if self.vm.frames.last().is_some() {
-            format!(
-                " Call Frame -- {} ",
-                self.vm.frame().code_block().name().to_std_string_escaped()
-            )
-        } else {
-            " VM Start ".to_string()
-        };
-
-        println!(
-            "{}",
-            self.vm
-                .frame()
-                .code_block
-                .to_interned_string(self.interner())
-        );
-        println!(
-            "{msg:-^width$}",
-            width = Self::COLUMN_WIDTH * Self::NUMBER_OF_COLUMNS - 10
-        );
-        println!(
-            "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {:<OPERAND_COLUMN_WIDTH$} Stack\n",
-            "Time",
-            "Opcode",
-            "Operands",
-            TIME_COLUMN_WIDTH = Self::TIME_COLUMN_WIDTH,
-            OPCODE_COLUMN_WIDTH = Self::OPCODE_COLUMN_WIDTH,
-            OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
-        );
-    }
-
     fn trace_execute_instruction(&mut self) -> JsResult<CompletionType> {
         let mut pc = self.vm.frame().pc as usize;
         let opcode: Opcode = self.vm.frame().code_block.read::<u8>(pc).into();
@@ -275,14 +239,9 @@ impl Context<'_> {
             stack
         };
 
-        println!(
-            "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {stack}",
-            format!("{}μs", duration.as_micros()),
-            opcode.as_str(),
-            TIME_COLUMN_WIDTH = Self::TIME_COLUMN_WIDTH,
-            OPCODE_COLUMN_WIDTH = Self::OPCODE_COLUMN_WIDTH,
-            OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
-        );
+        if let Some(trace) = &self.vm.trace {
+            trace.trace_instruction(duration.as_micros(), opcode.as_str(), operands, stack);
+        }
 
         result
     }
@@ -310,8 +269,14 @@ impl Context<'_> {
         let _timer = Profiler::global().start_event("run", "vm");
 
         #[cfg(feature = "trace")]
-        if self.vm.trace {
-            self.trace_call_frame();
+        if let Some(trace) = &self.vm.trace {
+            if !trace.bytecode_traced() {
+                trace.trace_compiled_bytecode(&self.vm, self.interner());
+                trace.trace_call_frame(&self.vm);
+                self.vm.trace.as_mut().expect("trace exists here").set_traced(true);
+            } else {
+                trace.trace_call_frame(&self.vm)
+            }
         }
 
         loop {
@@ -326,7 +291,7 @@ impl Context<'_> {
             }
 
             #[cfg(feature = "trace")]
-            let result = if self.vm.trace || self.vm.frame().code_block.traceable() {
+            let result = if self.vm.trace.is_some() {
                 self.trace_execute_instruction()
             } else {
                 self.execute_instruction()

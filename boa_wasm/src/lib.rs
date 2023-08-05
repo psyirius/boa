@@ -62,6 +62,7 @@ use boa_engine::{Context, Source};
 use chrono as _;
 use getrandom as _;
 use wasm_bindgen::prelude::*;
+use js_sys;
 
 #[wasm_bindgen(start)]
 fn main() {
@@ -73,6 +74,35 @@ fn main() {
 pub fn evaluate(src: &str) -> Result<String, JsValue> {
     // Setup the executor
     Context::default()
+        .eval(Source::from_bytes(src))
+        .map_err(|e| JsValue::from(format!("Uncaught {e}")))
+        .map(|v| v.display().to_string())
+}
+
+#[wasm_bindgen]
+/// Evaluate some JavaScript with trace hooks.
+pub fn evaluate_with_debug_hooks(src: &str, compiled_output_action: &js_sys::Function, trace_output_action: &js_sys::Function) -> Result<String, JsValue> {
+    let ca_clone = compiled_output_action.clone();
+    let compiled_action = move |output:&str| {
+        let this = JsValue::null();
+        let o = JsValue::from(output);
+        let _unused = ca_clone.call1(&this, &o);
+    };
+
+    let ta_clone = trace_output_action.clone();
+    let trace_action = move |output: &str| {
+        let this = JsValue::null();
+        let o = JsValue::from(output);
+        let _unused = ta_clone.call1(&this, &o);
+    };
+
+    // setup executor
+    let mut context = Context::default();
+    context.set_trace();
+    context.set_custom_compile_trace(Box::new(compiled_action));
+    context.set_custom_runtime_trace(Box::new(trace_action));
+
+    context
         .eval(Source::from_bytes(src))
         .map_err(|e| JsValue::from(format!("Uncaught {e}")))
         .map(|v| v.display().to_string())

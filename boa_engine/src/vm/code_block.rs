@@ -192,11 +192,14 @@ impl CodeBlock {
         &self.name
     }
 
+    /*
     /// Check if the function is traced.
     #[cfg(feature = "trace")]
     pub(crate) fn traceable(&self) -> bool {
         self.flags.get().contains(CodeBlockFlags::TRACEABLE)
     }
+    */
+
     /// Enable or disable instruction tracing to `stdout`.
     #[cfg(feature = "trace")]
     #[inline]

@@ -379,8 +379,24 @@ impl<'host> Context<'host> {
     /// Set the value of trace on the context
     #[cfg(feature = "trace")]
     #[inline]
-    pub fn set_trace(&mut self, trace: bool) {
-        self.vm.trace = trace;
+    pub fn set_trace(&mut self) {
+        self.vm.initialize_trace()
+    }
+
+    #[cfg(feature = "trace")]
+    /// Sets custom handling of compilation trace output
+    pub fn set_custom_compile_trace(&mut self, f: Box<dyn Fn(&str) -> ()>) {
+        if let Some(trace) = &mut self.vm.trace {
+            trace.set_compiled_action(f)
+        }
+    }
+
+    #[cfg(feature = "trace")]
+    /// Sets custom handling of trace action.
+    pub fn set_custom_runtime_trace(&mut self, f: Box<dyn Fn(&str)>) {
+        if let Some(trace) = &mut self.vm.trace {
+            trace.set_trace_action(f)
+        }
     }
 
     /// Get optimizer options.
