@@ -114,6 +114,16 @@ impl VmTrace {
         }
     }
 
+    pub(crate) fn trace_frame_end(&self, return_msg: &str) {
+        let msg = format!(" Call Frame -- <Exiting frame via {}>", return_msg);
+        let frame_footer = format!(
+            "{msg:-^width$}",
+            width = Self::COLUMN_WIDTH * Self::NUMBER_OF_COLUMNS - 10
+        );
+
+        self.trigger_trace_action(&frame_footer);
+    }
+
     pub(crate) fn trace_instruction(&self, duration: u128, opcode: &str, operands: String, stack: String) {
         let instruction_trace = format!(
             "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {stack}",

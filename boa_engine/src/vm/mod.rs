@@ -17,7 +17,7 @@ use boa_gc::{custom_trace, Finalize, Gc, Trace};
 use boa_profiler::Profiler;
 use std::mem::size_of;
 
-#[cfg(feature = "trace")]
+#[cfg(all(feature = "trace", not(target_arch="wasm32")))]
 use std::time::Instant;
 
 mod call_frame;
@@ -214,9 +214,12 @@ impl Context<'_> {
             .code_block
             .instruction_operands(&mut pc, self.interner());
 
+        #[cfg(not(target_arch = "wasm32"))]
         let instant = Instant::now();
+
         let result = self.execute_instruction();
 
+        #[cfg(not(target_arch = "wasm32"))]
         let duration = instant.elapsed();
 
         let stack = {
@@ -240,7 +243,10 @@ impl Context<'_> {
         };
 
         if let Some(trace) = &self.vm.trace {
+            #[cfg(not(target_arch = "wasm32"))]
             trace.trace_instruction(duration.as_micros(), opcode.as_str(), operands, stack);
+            #[cfg(target_arch = "wasm32")]
+            trace.trace_instruction(0, opcode.as_str(), operands, stack);
         }
 
         result
@@ -303,11 +309,21 @@ impl Context<'_> {
             match result {
                 Ok(CompletionType::Normal) => {}
                 Ok(CompletionType::Return) => {
+                    #[cfg(feature = "trace")]
+                    if let Some(trace) = &self.vm.trace {
+                        trace.trace_frame_end("Return")
+                    }
+
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
                     let execution_result = std::mem::take(&mut self.vm.return_value);
                     return CompletionRecord::Normal(execution_result);
                 }
                 Ok(CompletionType::Throw) => {
+                    #[cfg(feature = "trace")]
+                    if let Some(trace) = &self.vm.trace {
+                        trace.trace_frame_end("Throw")
+                    }
+
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
                     return CompletionRecord::Throw(
                         self.vm
@@ -318,6 +334,11 @@ impl Context<'_> {
                 }
                 // Early return immediately.
                 Ok(CompletionType::Yield) => {
+                    #[cfg(feature = "trace")]
+                    if let Some(trace) = &self.vm.trace {
+                        trace.trace_frame_end("Yield")
+                    }
+
                     let result = self.vm.pop();
                     return CompletionRecord::Return(result);
                 }
@@ -343,6 +364,11 @@ impl Context<'_> {
                     if self.vm.handle_exception_at(pc) {
                         self.vm.pending_exception = Some(err);
                         continue;
+                    }
+
+                    #[cfg(feature = "trace")]
+                    if let Some(trace) = &self.vm.trace {
+                        trace.trace_frame_end("Throw")
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
