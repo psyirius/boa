@@ -124,22 +124,26 @@ impl VmTrace {
         self.trigger_trace_action(&frame_footer);
     }
 
-    pub(crate) fn trace_instruction(&self, duration: u128, opcode: &str, operands: String, stack: String) {
-        #[cfg(not(target_arch = "wasm32"))]
+    // NOTE(nekevss): duration cannot be handled in a wasm32 env. Figure a different way to profile
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn trace_instruction(&self, opcode: &str, operands: String, stack: String) {
         let instruction_trace = format!(
             "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {stack}",
-            format!("{}μs", duration),
+            "--μs",
             opcode,
             TIME_COLUMN_WIDTH = Self::TIME_COLUMN_WIDTH,
             OPCODE_COLUMN_WIDTH = Self::OPCODE_COLUMN_WIDTH,
             OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
         );
 
-        // NOTE(nekevss): duration cannot be handled in a wasm32 env. Figure a different way to profile
-        #[cfg(target_arch = "wasm32")]
+        self.trigger_trace_action(&instruction_trace);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn trace_instruction(&self, duration: u128, opcode: &str, operands: String, stack: String) {
         let instruction_trace = format!(
             "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {stack}",
-            "--μs",
+            format!("{}μs", duration),
             opcode,
             TIME_COLUMN_WIDTH = Self::TIME_COLUMN_WIDTH,
             OPCODE_COLUMN_WIDTH = Self::OPCODE_COLUMN_WIDTH,

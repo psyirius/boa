@@ -247,7 +247,7 @@ impl Context<'_> {
             #[cfg(not(target_arch = "wasm32"))]
             trace.trace_instruction(duration.as_micros(), opcode.as_str(), operands, stack);
             #[cfg(target_arch = "wasm32")]
-            trace.trace_instruction(0, opcode.as_str(), operands, stack);
+            trace.trace_instruction(opcode.as_str(), operands, stack);
         }
 
         result
