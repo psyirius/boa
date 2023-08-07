@@ -205,6 +205,7 @@ pub(crate) enum CompletionType {
 
 #[cfg(feature = "trace")]
 impl Context<'_> {
+    // NOTE(nekevss): Ideally, this would live in `VmTrace`: Vm would need to be removed from context.
     fn trace_execute_instruction(&mut self) -> JsResult<CompletionType> {
         let mut pc = self.vm.frame().pc as usize;
         let opcode: Opcode = self.vm.frame().code_block.read::<u8>(pc).into();

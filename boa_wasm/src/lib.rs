@@ -107,3 +107,83 @@ pub fn evaluate_with_debug_hooks(src: &str, compiled_output_action: &js_sys::Fun
         .map_err(|e| JsValue::from(format!("Uncaught {e}")))
         .map(|v| v.display().to_string())
 }
+
+#[derive(Debug)]
+#[wasm_bindgen]
+/// The WASM exposed `BoaJs` Object.
+pub struct BoaJs {
+    compiled_action: Option<js_sys::Function>,
+    trace_action: Option<js_sys::Function>,
+}
+
+#[wasm_bindgen]
+impl BoaJs {
+    /// Create a new BoaJs Object.
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            compiled_action: None,
+            trace_action: None,
+        }
+    }
+
+    /// Set a Js Closure action for handling Boa's ByteCompiler trace output.
+    pub fn set_compiled_output_action(&mut self, f: &js_sys::Function) {
+        let fun = f.clone();
+        self.compiled_action = Some(fun);
+    }
+
+    /// Set a Js Closure action for handling Boa's VM Trace output.
+    pub fn set_trace_output_action(&mut self, f: &js_sys::Function) {
+        let fun = f.clone();
+        self.trace_action = Some(fun);
+    }
+
+    /// Evaluate some Js Source Code with trace active.
+    pub fn evaluate_with_trace(&self, src: &str) -> Result<String, JsValue> {
+
+        // setup executor
+        let mut context = Context::default();
+
+        context.set_trace();
+
+        if let Some(fun) = &self.compiled_action {
+            let fun_clone = fun.clone();
+            let action = move |output: &str| {
+                let this = JsValue::null();
+                let o = JsValue::from(output);
+                let _unused = fun_clone.call1(&this, &o);
+            };
+            context.set_custom_compile_trace(Box::new(action));
+        } else {
+            let action = |_o: &str| {};
+            context.set_custom_compile_trace(Box::new(action))
+        }
+
+        if let Some(fun) = &self.trace_action {
+            let fun_clone = fun.clone();
+            let action = move |output: &str| {
+                let this = JsValue::null();
+                let o = JsValue::from(output);
+                let _unused = fun_clone.call1(&this, &o);
+            };
+            context.set_custom_runtime_trace(Box::new(action));
+        } else {
+            let action = |_o: &str| {};
+            context.set_custom_runtime_trace(Box::new(action));
+        }
+
+        context
+            .eval(Source::from_bytes(src))
+            .map_err(|e| JsValue::from(format!("Uncaught {e}")))
+            .map(|v| v.display().to_string())
+    }
+
+    /// Evaluate Js Source code without running trace.
+    pub fn evaluate(&self, src:&str) -> Result<String, JsValue> {
+        Context::default()
+            .eval(Source::from_bytes(src))
+            .map_err(|e| JsValue::from(format!("Uncaught {e}")))
+            .map(|v| v.display().to_string())
+    }
+}
