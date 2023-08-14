@@ -94,7 +94,7 @@ use std::{
     fs::{self, File},
     io::Read,
     ops::{Add, AddAssign},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, process::Command,
 };
 
 /// Structure to allow defining ignored tests, features and files that should
@@ -241,6 +241,39 @@ fn main() -> Result<()> {
     }
 }
 
+fn clone_test262() {
+    const TEST262_REPOSITORY: &str = "https://github.com/tc39/test262";
+    const TEST262_COMMIT: &str = "0c87a86b58391b40aa7623b919603d87d4b77a4d";
+    const TEST262_DIRECTORY: &str = "test262";
+
+    if Path::new(TEST262_DIRECTORY).is_dir() {
+        return;
+    }
+
+    println!("cloning test262");
+    let result = Command::new("git")
+                    .arg("clone")
+                    .arg(TEST262_REPOSITORY)
+                    .arg(TEST262_DIRECTORY)
+                    .status()
+                    .expect("");
+
+    println!("result: {result}");
+    assert!(result.success());
+
+    println!("reset to known-good rev");
+    let result = Command::new("git")
+                    .arg("reset")
+                    .arg("--hard")
+                    .arg(TEST262_COMMIT)
+                    .current_dir(TEST262_DIRECTORY)
+                    .status()
+                    .expect("");
+
+    println!("result: {result}");
+    assert!(result.success());
+}
+
 /// Runs the full test suite.
 #[allow(clippy::too_many_arguments)]
 fn run_test_suite(
@@ -263,6 +296,8 @@ fn run_test_suite(
             fs::create_dir_all(path).wrap_err("could not create the output directory")?;
         }
     }
+
+    clone_test262();
 
     let ignored = {
         let mut input = String::new();
