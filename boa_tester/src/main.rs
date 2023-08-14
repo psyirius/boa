@@ -94,7 +94,8 @@ use std::{
     fs::{self, File},
     io::Read,
     ops::{Add, AddAssign},
-    path::{Path, PathBuf}, process::Command,
+    path::{Path, PathBuf},
+    process::Command,
 };
 
 /// Structure to allow defining ignored tests, features and files that should
@@ -157,8 +158,12 @@ enum Cli {
         verbose: u8,
 
         /// Path to the Test262 suite.
-        #[arg(long, default_value = "./test262", value_hint = ValueHint::DirPath)]
-        test262_path: PathBuf,
+        #[arg(long, value_hint = ValueHint::DirPath)]
+        test262_path: Option<PathBuf>,
+
+        /// Specify the Test262 commit when cloning the repository.
+        #[arg(long)]
+        test262_commit: Option<String>,
 
         /// Which specific test or test suite to run. Should be a path relative to the Test262 directory: e.g. "test/language/types/number"
         #[arg(short, long, default_value = "test", value_hint = ValueHint::AnyPath)]
@@ -204,6 +209,8 @@ enum Cli {
     },
 }
 
+const DEFAULT_TEST262_DIRECTORY: &str = "test262";
+
 /// Program entry point.
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -211,6 +218,7 @@ fn main() -> Result<()> {
         Cli::Run {
             verbose,
             test262_path,
+            test262_commit,
             suite,
             output,
             optimize,
@@ -218,21 +226,31 @@ fn main() -> Result<()> {
             ignored: ignore,
             edition,
             versioned,
-        } => run_test_suite(
-            verbose,
-            !disable_parallelism,
-            test262_path.as_path(),
-            suite.as_path(),
-            output.as_deref(),
-            ignore.as_path(),
-            edition.unwrap_or_default(),
-            versioned,
-            if optimize {
-                OptimizerOptions::OPTIMIZE_ALL
+        } => {
+            let test262_path = if let Some(path) = test262_path.as_deref() {
+                path
             } else {
-                OptimizerOptions::empty()
-            },
-        ),
+                clone_test262(test262_commit.as_deref())?;
+
+                Path::new(DEFAULT_TEST262_DIRECTORY)
+            };
+
+            run_test_suite(
+                verbose,
+                !disable_parallelism,
+                test262_path,
+                suite.as_path(),
+                output.as_deref(),
+                ignore.as_path(),
+                edition.unwrap_or_default(),
+                versioned,
+                if optimize {
+                    OptimizerOptions::OPTIMIZE_ALL
+                } else {
+                    OptimizerOptions::empty()
+                },
+            )
+        }
         Cli::Compare {
             base,
             new,
@@ -241,37 +259,45 @@ fn main() -> Result<()> {
     }
 }
 
-fn clone_test262() {
+fn clone_test262(commit: Option<&str>) -> Result<()> {
     const TEST262_REPOSITORY: &str = "https://github.com/tc39/test262";
-    const TEST262_COMMIT: &str = "0c87a86b58391b40aa7623b919603d87d4b77a4d";
-    const TEST262_DIRECTORY: &str = "test262";
 
-    if Path::new(TEST262_DIRECTORY).is_dir() {
-        return;
+    if Path::new(DEFAULT_TEST262_DIRECTORY).is_dir() {
+        return Ok(());
     }
 
-    println!("cloning test262");
+    println!("Cloning test262...");
     let result = Command::new("git")
-                    .arg("clone")
-                    .arg(TEST262_REPOSITORY)
-                    .arg(TEST262_DIRECTORY)
-                    .status()
-                    .expect("");
+        .arg("clone")
+        .arg(TEST262_REPOSITORY)
+        .arg(DEFAULT_TEST262_DIRECTORY)
+        .status()?;
 
-    println!("result: {result}");
-    assert!(result.success());
+    if !result.success() {
+        bail!(
+            "test262 cloning failed with return code {:?}",
+            result.code()
+        );
+    }
 
-    println!("reset to known-good rev");
-    let result = Command::new("git")
-                    .arg("reset")
-                    .arg("--hard")
-                    .arg(TEST262_COMMIT)
-                    .current_dir(TEST262_DIRECTORY)
-                    .status()
-                    .expect("");
+    if let Some(commit) = commit {
+        println!("Reset test262 to commit: {commit}...");
+        let result = Command::new("git")
+            .arg("reset")
+            .arg("--hard")
+            .arg(commit)
+            .current_dir(DEFAULT_TEST262_DIRECTORY)
+            .status()?;
 
-    println!("result: {result}");
-    assert!(result.success());
+        if !result.success() {
+            bail!(
+                "test262 commit {commit} checkout failed with return code: {:?}",
+                result.code()
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /// Runs the full test suite.
@@ -296,8 +322,6 @@ fn run_test_suite(
             fs::create_dir_all(path).wrap_err("could not create the output directory")?;
         }
     }
-
-    clone_test262();
 
     let ignored = {
         let mut input = String::new();
