@@ -98,7 +98,7 @@ pub fn evaluate_with_debug_hooks(src: &str, compiled_output_action: &js_sys::Fun
 
     // setup executor
     let mut context = Context::default();
-    context.set_trace();
+    context.init_trace();
     context.set_custom_compile_trace(Box::new(compiled_action));
     context.set_custom_runtime_trace(Box::new(trace_action));
 
@@ -145,7 +145,7 @@ impl BoaJs {
         // setup executor
         let mut context = Context::default();
 
-        context.set_trace();
+        context.init_trace();
 
         if let Some(fun) = &self.compiled_action {
             let fun_clone = fun.clone();

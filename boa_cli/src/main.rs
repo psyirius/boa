@@ -384,7 +384,7 @@ fn main() -> Result<(), io::Error> {
 
     // Trace Output
     if args.trace {
-        context.set_trace();
+        context.init_trace();
     }
 
     if args.debug_object {

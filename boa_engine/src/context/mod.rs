@@ -376,11 +376,18 @@ impl<'host> Context<'host> {
         &self.realm
     }
 
-    /// Set the value of trace on the context
+    /// Initializes a `Vm` trace from the context
     #[cfg(feature = "trace")]
     #[inline]
-    pub fn set_trace(&mut self) {
-        self.vm.initialize_trace()
+    pub fn init_trace(&mut self) {
+        self.vm.initialize_trace();
+    }
+
+    /// Initializes a Partial VmTrace.
+    #[cfg(feature = "trace")]
+    #[inline]
+    pub fn init_partial_trace(&mut self) {
+        self.vm.init_partial_trace();
     }
 
     #[cfg(feature = "trace")]

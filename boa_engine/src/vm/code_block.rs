@@ -70,10 +70,19 @@ bitflags! {
 
         /// The `[[ClassFieldInitializerName]]` internal slot.
         const IN_CLASS_FIELD_INITIALIZER = 0b0010_0000;
+    }
+}
 
+bitflags! {
+    /// Trace specific flags for [`CodeBlock`]
+    #[derive(Clone, Copy, Debug, Finalize)]
+    #[cfg(feature = "trace")]
+    pub(crate) struct TraceFlags: u8 {
         /// Trace instruction execution to `stdout`.
-        #[cfg(feature = "trace")]
-        const TRACEABLE = 0b1000_0000;
+        const TRACEABLE = 0b0000_0001;
+
+        /// Has the `CodeBlock` been traced.
+        const CALLFRAME_TRACED = 0b0000_0010;
     }
 }
 
@@ -124,6 +133,9 @@ pub struct CodeBlock {
     #[unsafe_ignore_trace]
     pub(crate) flags: Cell<CodeBlockFlags>,
 
+    #[unsafe_ignore_trace]
+    pub(crate) trace_flags: Cell<TraceFlags>,
+
     /// The number of arguments expected.
     pub(crate) length: u32,
 
@@ -170,6 +182,8 @@ impl CodeBlock {
     pub fn new(name: JsString, length: u32, strict: bool) -> Self {
         let mut flags = CodeBlockFlags::empty();
         flags.set(CodeBlockFlags::STRICT, strict);
+        #[cfg(feature = "trace")]
+        let t_flags = TraceFlags::empty();
         Self {
             bytecode: Box::default(),
             literals: Box::default(),
@@ -183,6 +197,8 @@ impl CodeBlock {
             params: FormalParameterList::default(),
             handlers: ThinVec::default(),
             compile_environments: Box::default(),
+            #[cfg(feature = "trace")]
+            trace_flags: Cell::new(t_flags)
         }
     }
 
@@ -192,21 +208,31 @@ impl CodeBlock {
         &self.name
     }
 
-    /*
     /// Check if the function is traced.
     #[cfg(feature = "trace")]
     pub(crate) fn traceable(&self) -> bool {
-        self.flags.get().contains(CodeBlockFlags::TRACEABLE)
+        self.trace_flags.get().contains(TraceFlags::TRACEABLE)
     }
-    */
 
     /// Enable or disable instruction tracing to `stdout`.
     #[cfg(feature = "trace")]
     #[inline]
     pub fn set_traceable(&self, value: bool) {
-        let mut flags = self.flags.get();
-        flags.set(CodeBlockFlags::TRACEABLE, value);
-        self.flags.set(flags);
+        let mut flags = self.trace_flags.get();
+        flags.set(TraceFlags::TRACEABLE, value);
+        self.trace_flags.set(flags);
+    }
+
+    #[cfg(feature = "trace")]
+    pub(crate) fn frame_traced(&self) -> bool {
+        self.trace_flags.get().contains(TraceFlags::CALLFRAME_TRACED)
+    }
+
+    #[cfg(feature = "trace")]
+    pub(crate) fn set_frame_traced(&self, value:bool) {
+        let mut flags = self.trace_flags.get();
+        flags.set(TraceFlags::CALLFRAME_TRACED, value);
+        self.trace_flags.set(flags);
     }
 
     /// Check if the function is a class constructor.

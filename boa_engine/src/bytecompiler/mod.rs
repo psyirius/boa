@@ -39,6 +39,9 @@ use boa_gc::Gc;
 use boa_interner::{Interner, Sym};
 use rustc_hash::FxHashMap;
 
+#[cfg(feature="trace")]
+use crate::vm::TraceFlags;
+
 pub(crate) use function::FunctionCompiler;
 pub(crate) use jump_control::JumpControlInfo;
 use thin_vec::ThinVec;
@@ -1519,6 +1522,8 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             compile_environments: self.compile_environments.into_boxed_slice(),
             handlers: self.handlers,
             flags: Cell::new(self.code_block_flags),
+            #[cfg(feature="trace")]
+            trace_flags: Cell::new(TraceFlags::empty()),
         }
     }
 

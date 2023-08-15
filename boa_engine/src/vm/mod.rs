@@ -25,7 +25,7 @@ mod code_block;
 mod completion_record;
 mod opcode;
 // TODO: #[cfg(feature = "trace")]
-mod vm_trace;
+pub mod vm_trace;
 
 mod runtime_limits;
 
@@ -46,6 +46,9 @@ pub(crate) use {
     completion_record::CompletionRecord,
     opcode::BindingOpcode,
 };
+
+#[cfg(feature = "trace")]
+pub(crate) use code_block::TraceFlags;
 
 #[cfg(test)]
 mod tests;
@@ -277,10 +280,16 @@ impl Context<'_> {
 
         #[cfg(feature = "trace")]
         if let Some(trace) = &self.vm.trace {
-            if !trace.bytecode_traced() {
+            if trace.is_full_trace() {
                 trace.trace_compiled_bytecode(&self.vm, self.interner());
                 trace.trace_call_frame(&self.vm);
-                self.vm.trace.as_mut().expect("trace exists here").set_traced(true);
+            } else if trace.is_partial_trace() && self.vm.frame().code_block().traceable() {
+                if !self.vm.frame().code_block().frame_traced() {
+                    trace.trace_current_bytecode(&self.vm, self.interner());
+                    self.vm.frame().code_block().set_frame_traced(true);
+                }
+                trace.trace_call_frame(&self.vm);
+                trace.activate();
             } else {
                 trace.trace_call_frame(&self.vm)
             }
@@ -298,10 +307,11 @@ impl Context<'_> {
             }
 
             #[cfg(feature = "trace")]
-            let result = if self.vm.trace.is_some() {
-                self.trace_execute_instruction()
-            } else {
-                self.execute_instruction()
+            let result = match &self.vm.trace {
+                Some(trace) if trace.should_trace() => {
+                    self.trace_execute_instruction()
+                },
+                _=>self.execute_instruction(),
             };
 
             #[cfg(not(feature = "trace"))]
@@ -312,7 +322,8 @@ impl Context<'_> {
                 Ok(CompletionType::Return) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Return")
+                        trace.trace_frame_end("Return");
+                        trace.inactivate();
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
@@ -322,7 +333,8 @@ impl Context<'_> {
                 Ok(CompletionType::Throw) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Throw")
+                        trace.trace_frame_end("Throw");
+                        trace.inactivate();
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
@@ -337,7 +349,8 @@ impl Context<'_> {
                 Ok(CompletionType::Yield) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Yield")
+                        trace.trace_frame_end("Yield");
+                        trace.inactivate();
                     }
 
                     let result = self.vm.pop();
@@ -369,7 +382,8 @@ impl Context<'_> {
 
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Throw")
+                        trace.trace_frame_end("Throw");
+                        trace.inactivate();
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);

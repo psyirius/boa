@@ -1,13 +1,30 @@
+//! Boa's `Trace` module for the `Vm`.
+
 use std::collections::VecDeque;
 use std::fmt;
+use std::cell::Cell;
+use bitflags::bitflags;
 
 use boa_interner::{Interner, ToInternedString};
 
 use super::Vm;
 
+bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct TraceOptions: u8 {
+        const FULL_TRACE =  0b0000_0001;
+
+        const ACTIVE = 0b0000_0010;
+    }
+}
+
 impl Vm {
     pub(crate) fn initialize_trace(&mut self) {
         self.trace = Some(VmTrace::default())
+    }
+
+    pub(crate) fn init_partial_trace(&mut self) {
+        self.trace = Some(VmTrace::new_partial())
     }
 }
 
@@ -16,31 +33,79 @@ impl Default for VmTrace {
         Self {
             compiled_action: None,
             trace_action: None,
-            bytecode_trace: false,
+            options: Cell::new(TraceOptions::FULL_TRACE),
         }
     }
 }
 
-pub(crate) struct VmTrace {
+/// `VmTrace` is a boa spcific structure for running Boa's Virtual Machine trace.
+///
+/// The struct provides options for a user to set customized actions for handling
+/// the trace's messages.
+///
+/// Currently, the trace supports setting two different actions:
+/// - `compiled_action`
+/// - `trace_action`
+///
+/// About the actions
+///
+/// After the Global callframe is initially provided. It searches
+/// for all possible compiled output
+pub struct VmTrace {
     compiled_action: Option<Box<dyn Fn(&str) -> ()>>,
     trace_action: Option<Box<dyn Fn(&str) -> ()>>,
-    bytecode_trace: bool
+    options: Cell<TraceOptions>,
 }
 
 impl VmTrace {
-    pub(crate) const fn bytecode_traced(&self) -> bool {
-        self.bytecode_trace
+    pub(crate) fn new_partial() -> Self {
+        Self {
+            compiled_action: None,
+            trace_action: None,
+            options: Cell::new(TraceOptions::empty())
+        }
     }
 
-    pub(crate) fn set_traced(&mut self, value: bool) {
-        self.bytecode_trace = value
+    // Returns if Trace type is a complete trace.
+    pub(crate) fn is_full_trace(&self) -> bool {
+        self.options.get().contains(TraceOptions::FULL_TRACE)
     }
 
-    pub(crate) fn set_compiled_action(&mut self, f: Box<dyn Fn(&str)->()>) {
+    /// Returns if the trace is only a partial one.
+    pub fn is_partial_trace(&self) -> bool {
+        !self.is_full_trace()
+    }
+
+    /// Returns if the a partial trace has been determined to be active.
+    pub fn is_active(&self) -> bool {
+        self.options.get().contains(TraceOptions::ACTIVE)
+    }
+
+    /// Sets the `ACTIVE` bitflag to true.
+    pub(crate) fn activate(&self) {
+        let mut flags = self.options.get();
+        flags.set(TraceOptions::ACTIVE, true);
+        self.options.set(flags);
+    }
+
+    /// Sets the `ACTIVE` flag to false.
+    pub(crate) fn inactivate(&self) {
+        let mut flags = self.options.get();
+        flags.set(TraceOptions::ACTIVE, false);
+        self.options.set(flags);
+    }
+
+    pub(crate) fn should_trace(&self) -> bool {
+        self.is_full_trace() || self.is_active()
+    }
+
+    /// Sets the `compiled_action` of `VmTrace` to a custom user-defined action.
+    pub fn set_compiled_action(&mut self, f: Box<dyn Fn(&str)->()>) {
         self.compiled_action = Some(f)
     }
 
-    pub(crate) fn set_trace_action(&mut self, f: Box<dyn Fn(&str)->()>) {
+    /// Sets the `trace_action` of `VmTrace` to a custom user-defined action.
+    pub fn set_trace_action(&mut self, f: Box<dyn Fn(&str)->()>) {
         self.trace_action = Some(f)
     }
 }
@@ -85,6 +150,10 @@ impl VmTrace {
                 self.trigger_compiled_output_action(&block.to_interned_string(interner))
             }
         }
+    }
+
+    pub(crate) fn trace_current_bytecode(&self, vm: &Vm, interner: &Interner) {
+        self.trigger_compiled_output_action(&vm.frame().code_block().to_interned_string(interner));
     }
 
     pub(crate) fn trace_call_frame(&self, vm: &Vm) {
