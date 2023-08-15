@@ -198,7 +198,7 @@ impl CodeBlock {
             handlers: ThinVec::default(),
             compile_environments: Box::default(),
             #[cfg(feature = "trace")]
-            trace_flags: Cell::new(t_flags)
+            trace_flags: Cell::new(t_flags),
         }
     }
 
@@ -225,11 +225,13 @@ impl CodeBlock {
 
     #[cfg(feature = "trace")]
     pub(crate) fn frame_traced(&self) -> bool {
-        self.trace_flags.get().contains(TraceFlags::CALLFRAME_TRACED)
+        self.trace_flags
+            .get()
+            .contains(TraceFlags::CALLFRAME_TRACED)
     }
 
     #[cfg(feature = "trace")]
-    pub(crate) fn set_frame_traced(&self, value:bool) {
+    pub(crate) fn set_frame_traced(&self, value: bool) {
         let mut flags = self.trace_flags.get();
         flags.set(TraceFlags::CALLFRAME_TRACED, value);
         self.trace_flags.set(flags);

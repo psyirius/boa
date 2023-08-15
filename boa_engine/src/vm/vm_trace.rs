@@ -1,9 +1,9 @@
 //! Boa's `Trace` module for the `Vm`.
 
+use bitflags::bitflags;
+use std::cell::Cell;
 use std::collections::VecDeque;
 use std::fmt;
-use std::cell::Cell;
-use bitflags::bitflags;
 
 use boa_interner::{Interner, ToInternedString};
 
@@ -62,7 +62,7 @@ impl VmTrace {
         Self {
             compiled_action: None,
             trace_action: None,
-            options: Cell::new(TraceOptions::empty())
+            options: Cell::new(TraceOptions::empty()),
         }
     }
 
@@ -100,12 +100,12 @@ impl VmTrace {
     }
 
     /// Sets the `compiled_action` of `VmTrace` to a custom user-defined action.
-    pub fn set_compiled_action(&mut self, f: Box<dyn Fn(&str)->()>) {
+    pub fn set_compiled_action(&mut self, f: Box<dyn Fn(&str) -> ()>) {
         self.compiled_action = Some(f)
     }
 
     /// Sets the `trace_action` of `VmTrace` to a custom user-defined action.
-    pub fn set_trace_action(&mut self, f: Box<dyn Fn(&str)->()>) {
+    pub fn set_trace_action(&mut self, f: Box<dyn Fn(&str) -> ()>) {
         self.trace_action = Some(f)
     }
 }
@@ -209,7 +209,13 @@ impl VmTrace {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn trace_instruction(&self, duration: u128, opcode: &str, operands: String, stack: String) {
+    pub(crate) fn trace_instruction(
+        &self,
+        duration: u128,
+        opcode: &str,
+        operands: String,
+        stack: String,
+    ) {
         let instruction_trace = format!(
             "{:<TIME_COLUMN_WIDTH$} {:<OPCODE_COLUMN_WIDTH$} {operands:<OPERAND_COLUMN_WIDTH$} {stack}",
             format!("{}μs", duration),
@@ -222,7 +228,6 @@ impl VmTrace {
         self.trigger_trace_action(&instruction_trace);
     }
 }
-
 
 impl fmt::Debug for VmTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -239,8 +244,8 @@ impl fmt::Debug for VmTrace {
         };
 
         f.debug_struct("VmTrace")
-         .field("Compiled Action", &ca_msg)
-         .field("Runtime Trace Action", &ta_msg)
-         .finish()
+            .field("Compiled Action", &ca_msg)
+            .field("Runtime Trace Action", &ta_msg)
+            .finish()
     }
 }

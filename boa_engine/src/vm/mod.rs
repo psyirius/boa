@@ -17,7 +17,7 @@ use boa_gc::{custom_trace, Finalize, Gc, Trace};
 use boa_profiler::Profiler;
 use std::mem::size_of;
 
-#[cfg(all(feature = "trace", not(target_arch="wasm32")))]
+#[cfg(all(feature = "trace", not(target_arch = "wasm32")))]
 use std::time::Instant;
 
 mod call_frame;
@@ -308,10 +308,8 @@ impl Context<'_> {
 
             #[cfg(feature = "trace")]
             let result = match &self.vm.trace {
-                Some(trace) if trace.should_trace() => {
-                    self.trace_execute_instruction()
-                },
-                _=>self.execute_instruction(),
+                Some(trace) if trace.should_trace() => self.trace_execute_instruction(),
+                _ => self.execute_instruction(),
             };
 
             #[cfg(not(feature = "trace"))]

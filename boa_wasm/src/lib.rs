@@ -61,8 +61,8 @@
 use boa_engine::{Context, Source};
 use chrono as _;
 use getrandom as _;
-use wasm_bindgen::prelude::*;
 use js_sys;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 fn main() {
@@ -81,9 +81,13 @@ pub fn evaluate(src: &str) -> Result<String, JsValue> {
 
 #[wasm_bindgen]
 /// Evaluate some JavaScript with trace hooks.
-pub fn evaluate_with_debug_hooks(src: &str, compiled_output_action: &js_sys::Function, trace_output_action: &js_sys::Function) -> Result<String, JsValue> {
+pub fn evaluate_with_debug_hooks(
+    src: &str,
+    compiled_output_action: &js_sys::Function,
+    trace_output_action: &js_sys::Function,
+) -> Result<String, JsValue> {
     let ca_clone = compiled_output_action.clone();
-    let compiled_action = move |output:&str| {
+    let compiled_action = move |output: &str| {
         let this = JsValue::null();
         let o = JsValue::from(output);
         let _unused = ca_clone.call1(&this, &o);
@@ -141,7 +145,6 @@ impl BoaJs {
 
     /// Evaluate some Js Source Code with trace active.
     pub fn evaluate_with_trace(&self, src: &str) -> Result<String, JsValue> {
-
         // setup executor
         let mut context = Context::default();
 
@@ -180,7 +183,7 @@ impl BoaJs {
     }
 
     /// Evaluate Js Source code without running trace.
-    pub fn evaluate(&self, src:&str) -> Result<String, JsValue> {
+    pub fn evaluate(&self, src: &str) -> Result<String, JsValue> {
         Context::default()
             .eval(Source::from_bytes(src))
             .map_err(|e| JsValue::from(format!("Uncaught {e}")))
