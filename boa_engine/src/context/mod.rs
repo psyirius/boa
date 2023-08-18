@@ -383,7 +383,7 @@ impl<'host> Context<'host> {
         self.vm.initialize_trace();
     }
 
-    /// Initializes a Partial VmTrace.
+    /// Initializes a partial `Vm` trace from the context.
     #[cfg(feature = "trace")]
     #[inline]
     pub fn init_partial_trace(&mut self) {
@@ -392,9 +392,9 @@ impl<'host> Context<'host> {
 
     #[cfg(feature = "trace")]
     /// Sets custom handling of compilation trace output
-    pub fn set_custom_compile_trace(&mut self, f: Box<dyn Fn(&str) -> ()>) {
+    pub fn set_custom_compile_trace(&mut self, f: Box<dyn Fn(&str)>) {
         if let Some(trace) = &mut self.vm.trace {
-            trace.set_compiled_action(f)
+            trace.set_compiled_action(f);
         }
     }
 
@@ -402,7 +402,7 @@ impl<'host> Context<'host> {
     /// Sets custom handling of trace action.
     pub fn set_custom_runtime_trace(&mut self, f: Box<dyn Fn(&str)>) {
         if let Some(trace) = &mut self.vm.trace {
-            trace.set_trace_action(f)
+            trace.set_trace_action(f);
         }
     }
 

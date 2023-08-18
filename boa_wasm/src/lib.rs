@@ -57,11 +57,11 @@
     clippy::pedantic,
     clippy::nursery,
 )]
+#![allow(clippy::new_without_default, clippy::missing_const_for_fn)]
 
 use boa_engine::{Context, Source};
 use chrono as _;
 use getrandom as _;
-use js_sys;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -86,18 +86,18 @@ pub fn evaluate_with_debug_hooks(
     compiled_output_action: &js_sys::Function,
     trace_output_action: &js_sys::Function,
 ) -> Result<String, JsValue> {
-    let ca_clone = compiled_output_action.clone();
+    let compiled_clone = compiled_output_action.clone();
     let compiled_action = move |output: &str| {
         let this = JsValue::null();
         let o = JsValue::from(output);
-        let _unused = ca_clone.call1(&this, &o);
+        let _unused = compiled_clone.call1(&this, &o);
     };
 
-    let ta_clone = trace_output_action.clone();
+    let trace_clone = trace_output_action.clone();
     let trace_action = move |output: &str| {
         let this = JsValue::null();
         let o = JsValue::from(output);
-        let _unused = ta_clone.call1(&this, &o);
+        let _unused = trace_clone.call1(&this, &o);
     };
 
     // setup executor
@@ -123,6 +123,7 @@ pub struct BoaJs {
 #[wasm_bindgen]
 impl BoaJs {
     /// Create a new BoaJs Object.
+    #[must_use]
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
@@ -160,7 +161,7 @@ impl BoaJs {
             context.set_custom_compile_trace(Box::new(action));
         } else {
             let action = |_o: &str| {};
-            context.set_custom_compile_trace(Box::new(action))
+            context.set_custom_compile_trace(Box::new(action));
         }
 
         if let Some(fun) = &self.trace_action {

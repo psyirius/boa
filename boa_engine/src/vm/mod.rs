@@ -208,7 +208,7 @@ pub(crate) enum CompletionType {
 
 #[cfg(feature = "trace")]
 impl Context<'_> {
-    // NOTE(nekevss): Ideally, this would live in `VmTrace`: Vm would need to be removed from context.
+    // NOTE(nekevss): Ideally, this should probably live in `VmTrace`, but Vm would need to be removed from context.
     fn trace_execute_instruction(&mut self) -> JsResult<CompletionType> {
         let mut pc = self.vm.frame().pc as usize;
         let opcode: Opcode = self.vm.frame().code_block.read::<u8>(pc).into();
@@ -248,9 +248,9 @@ impl Context<'_> {
 
         if let Some(trace) = &self.vm.trace {
             #[cfg(not(target_arch = "wasm32"))]
-            trace.trace_instruction(duration.as_micros(), opcode.as_str(), operands, stack);
+            trace.trace_instruction(duration.as_micros(), opcode.as_str(), &operands, &stack);
             #[cfg(target_arch = "wasm32")]
-            trace.trace_instruction(opcode.as_str(), operands, stack);
+            trace.trace_instruction(opcode.as_str(), &operands, &stack);
         }
 
         result
@@ -280,19 +280,7 @@ impl Context<'_> {
 
         #[cfg(feature = "trace")]
         if let Some(trace) = &self.vm.trace {
-            if trace.is_full_trace() {
-                trace.trace_compiled_bytecode(&self.vm, self.interner());
-                trace.trace_call_frame(&self.vm);
-            } else if trace.is_partial_trace() && self.vm.frame().code_block().traceable() {
-                if !self.vm.frame().code_block().frame_traced() {
-                    trace.trace_current_bytecode(&self.vm, self.interner());
-                    self.vm.frame().code_block().set_frame_traced(true);
-                }
-                trace.trace_call_frame(&self.vm);
-                trace.activate();
-            } else {
-                trace.trace_call_frame(&self.vm)
-            }
+            trace.trace_call_frame(&self.vm, self.interner());
         }
 
         loop {
