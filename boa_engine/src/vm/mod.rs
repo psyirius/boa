@@ -24,8 +24,8 @@ mod call_frame;
 mod code_block;
 mod completion_record;
 mod opcode;
-// TODO: #[cfg(feature = "trace")]
-pub mod vm_trace;
+#[cfg(feature = "trace")]
+pub mod trace;
 
 mod runtime_limits;
 
@@ -34,7 +34,7 @@ pub mod flowgraph;
 
 pub use runtime_limits::RuntimeLimits;
 
-use self::vm_trace::VmTrace;
+use self::trace::VmTrace;
 pub use {call_frame::CallFrame, code_block::CodeBlock, opcode::Opcode};
 
 pub(crate) use {
@@ -308,8 +308,7 @@ impl Context<'_> {
                 Ok(CompletionType::Return) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Return");
-                        trace.inactivate();
+                        trace.trace_frame_end(&self.vm, "Return");
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
@@ -319,8 +318,7 @@ impl Context<'_> {
                 Ok(CompletionType::Throw) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Throw");
-                        trace.inactivate();
+                        trace.trace_frame_end(&self.vm, "Throw");
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);
@@ -335,8 +333,7 @@ impl Context<'_> {
                 Ok(CompletionType::Yield) => {
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Yield");
-                        trace.inactivate();
+                        trace.trace_frame_end(&self.vm, "Yield");
                     }
 
                     let result = self.vm.pop();
@@ -368,8 +365,7 @@ impl Context<'_> {
 
                     #[cfg(feature = "trace")]
                     if let Some(trace) = &self.vm.trace {
-                        trace.trace_frame_end("Throw");
-                        trace.inactivate();
+                        trace.trace_frame_end(&self.vm, "Throw");
                     }
 
                     self.vm.stack.truncate(self.vm.frame().fp as usize);

@@ -376,18 +376,26 @@ impl<'host> Context<'host> {
         &self.realm
     }
 
-    /// Initializes a `Vm` trace from the context
     #[cfg(feature = "trace")]
     #[inline]
+    /// Initializes a `Vm` trace from the context
     pub fn init_trace(&mut self) {
-        self.vm.initialize_trace();
+        let trace = crate::vm::trace::VmTrace::default();
+        self.vm.set_trace(trace);
     }
 
-    /// Initializes a partial `Vm` trace from the context.
     #[cfg(feature = "trace")]
     #[inline]
+    /// Initializes a partial `Vm` trace from the context.
     pub fn init_partial_trace(&mut self) {
-        self.vm.init_partial_trace();
+        let trace = crate::vm::trace::VmTrace::partial();
+        self.vm.set_trace(trace);
+    }
+
+    #[cfg(feature = "trace")]
+    /// Initialize a provided custom trace
+    pub fn set_custom_trace(&mut self, trace: crate::vm::trace::VmTrace) {
+        self.vm.set_trace(trace);
     }
 
     #[cfg(feature = "trace")]
