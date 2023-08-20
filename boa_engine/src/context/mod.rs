@@ -16,6 +16,9 @@ pub use maybe_shared::MaybeShared;
 pub use std::marker::PhantomData;
 use std::{io::Read, path::Path, rc::Rc};
 
+#[cfg(feature = "trace")]
+use crate::vm::trace;
+
 use crate::{
     builtins,
     class::{Class, ClassBuilder},
@@ -380,7 +383,7 @@ impl<'host> Context<'host> {
     #[inline]
     /// Initializes a `Vm` trace from the context
     pub fn init_trace(&mut self) {
-        let trace = crate::vm::trace::VmTrace::default();
+        let trace = trace::VmTrace::default();
         self.vm.set_trace(trace);
     }
 
@@ -388,30 +391,15 @@ impl<'host> Context<'host> {
     #[inline]
     /// Initializes a partial `Vm` trace from the context.
     pub fn init_partial_trace(&mut self) {
-        let trace = crate::vm::trace::VmTrace::partial();
+        let trace = trace::VmTrace::partial();
         self.vm.set_trace(trace);
     }
 
     #[cfg(feature = "trace")]
-    /// Initialize a provided custom trace
-    pub fn set_custom_trace(&mut self, trace: crate::vm::trace::VmTrace) {
-        self.vm.set_trace(trace);
-    }
-
-    #[cfg(feature = "trace")]
-    /// Sets custom handling of compilation trace output
-    pub fn set_custom_compile_trace(&mut self, f: Box<dyn Fn(&str)>) {
-        if let Some(trace) = &mut self.vm.trace {
-            trace.set_compiled_action(f);
-        }
-    }
-
-    #[cfg(feature = "trace")]
-    /// Sets custom handling of trace action.
-    pub fn set_custom_runtime_trace(&mut self, f: Box<dyn Fn(&str)>) {
-        if let Some(trace) = &mut self.vm.trace {
-            trace.set_trace_action(f);
-        }
+    /// Sets custom handling of trace messages.
+    pub fn set_tracer_implementation(&mut self, tracer: Box<dyn trace::Tracer>) {
+        let trace = trace::VmTrace::default().with_tracer(tracer);
+        self.vm.trace = Some(trace);
     }
 
     /// Get optimizer options.

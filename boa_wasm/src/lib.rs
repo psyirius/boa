@@ -59,7 +59,7 @@
 )]
 #![allow(clippy::new_without_default, clippy::missing_const_for_fn)]
 
-use boa_engine::{Context, Source};
+use boa_engine::{vm::trace::Tracer, Context, Source};
 use chrono as _;
 use getrandom as _;
 use wasm_bindgen::prelude::*;
@@ -102,9 +102,11 @@ pub fn evaluate_with_debug_hooks(
 
     // setup executor
     let mut context = Context::default();
-    context.init_trace();
-    context.set_custom_compile_trace(Box::new(compiled_action));
-    context.set_custom_runtime_trace(Box::new(trace_action));
+    let mut tracer = WasmTracer::default();
+    tracer.set_compiled_handler(Box::new(compiled_action));
+    tracer.set_trace_handler(Box::new(trace_action));
+
+    context.set_tracer_implementation(Box::new(tracer));
 
     context
         .eval(Source::from_bytes(src))
@@ -149,33 +151,31 @@ impl BoaJs {
         // setup executor
         let mut context = Context::default();
 
-        context.init_trace();
+        let mut tracer = WasmTracer::default();
 
-        if let Some(fun) = &self.compiled_action {
-            let fun_clone = fun.clone();
+        if let Some(func) = &self.compiled_action {
+            let func_clone = func.clone();
             let action = move |output: &str| {
                 let this = JsValue::null();
                 let o = JsValue::from(output);
-                let _unused = fun_clone.call1(&this, &o);
+                let _unused = func_clone.call1(&this, &o);
             };
-            context.set_custom_compile_trace(Box::new(action));
-        } else {
-            let action = |_o: &str| {};
-            context.set_custom_compile_trace(Box::new(action));
-        }
 
-        if let Some(fun) = &self.trace_action {
-            let fun_clone = fun.clone();
+            tracer.set_compiled_handler(Box::new(action));
+        };
+
+        if let Some(func) = &self.trace_action {
+            let func_clone = func.clone();
             let action = move |output: &str| {
                 let this = JsValue::null();
                 let o = JsValue::from(output);
-                let _unused = fun_clone.call1(&this, &o);
+                let _unused = func_clone.call1(&this, &o);
             };
-            context.set_custom_runtime_trace(Box::new(action));
-        } else {
-            let action = |_o: &str| {};
-            context.set_custom_runtime_trace(Box::new(action));
-        }
+
+            tracer.set_trace_handler(Box::new(action));
+        };
+
+        context.set_tracer_implementation(Box::new(tracer));
 
         context
             .eval(Source::from_bytes(src))
@@ -189,5 +189,49 @@ impl BoaJs {
             .eval(Source::from_bytes(src))
             .map_err(|e| JsValue::from(format!("Uncaught {e}")))
             .map(|v| v.display().to_string())
+    }
+}
+
+type ProvidedFunction = Box<dyn Fn(&str)>;
+
+#[derive(Default)]
+pub(crate) struct WasmTracer {
+    compiled_handler: Option<ProvidedFunction>,
+    trace_handler: Option<ProvidedFunction>,
+}
+
+impl WasmTracer {
+    fn set_compiled_handler(&mut self, compiled_handler: Box<dyn Fn(&str)>) {
+        self.compiled_handler = Some(compiled_handler);
+    }
+
+    fn set_trace_handler(&mut self, trace_handler: Box<dyn Fn(&str)>) {
+        self.trace_handler = Some(trace_handler);
+    }
+}
+
+impl Tracer for WasmTracer {
+    fn emit_bytecode_trace(&self, msg: &str) {
+        if let Some(action) = &self.compiled_handler {
+            action(msg);
+        }
+    }
+
+    fn emit_call_frame_entrance_trace(&self, msg: &str) {
+        if let Some(action) = &self.trace_handler {
+            action(msg);
+        }
+    }
+
+    fn emit_instruction_trace(&self, msg: &str) {
+        if let Some(action) = &self.trace_handler {
+            action(msg);
+        }
+    }
+
+    fn emit_call_frame_exit_trace(&self, msg: &str) {
+        if let Some(action) = &self.trace_handler {
+            action(msg);
+        }
     }
 }

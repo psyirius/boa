@@ -73,10 +73,10 @@ bitflags! {
     }
 }
 
+#[cfg(feature = "trace")]
 bitflags! {
     /// Trace specific flags for [`CodeBlock`]
     #[derive(Clone, Copy, Debug, Finalize)]
-    #[cfg(feature = "trace")]
     pub(crate) struct TraceFlags: u8 {
         /// Trace instruction execution to `stdout`.
         const TRACEABLE = 0b0000_0001;
@@ -133,6 +133,7 @@ pub struct CodeBlock {
     #[unsafe_ignore_trace]
     pub(crate) flags: Cell<CodeBlockFlags>,
 
+    #[cfg(feature = "trace")]
     #[unsafe_ignore_trace]
     pub(crate) trace_flags: Cell<TraceFlags>,
 
@@ -182,8 +183,10 @@ impl CodeBlock {
     pub fn new(name: JsString, length: u32, strict: bool) -> Self {
         let mut flags = CodeBlockFlags::empty();
         flags.set(CodeBlockFlags::STRICT, strict);
+
         #[cfg(feature = "trace")]
         let t_flags = TraceFlags::empty();
+
         Self {
             bytecode: Box::default(),
             literals: Box::default(),

@@ -32,9 +32,11 @@ mod runtime_limits;
 #[cfg(feature = "flowgraph")]
 pub mod flowgraph;
 
+#[cfg(feature = "trace")]
+use trace::VmTrace;
+
 pub use runtime_limits::RuntimeLimits;
 
-use self::trace::VmTrace;
 pub use {call_frame::CallFrame, code_block::CodeBlock, opcode::Opcode};
 
 pub(crate) use {

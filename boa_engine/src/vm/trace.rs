@@ -9,6 +9,41 @@ use boa_interner::{Interner, ToInternedString};
 
 use super::Vm;
 
+// TODO: Build out further, maybe provide more element visiblity and events/outputs
+/// The `Tracer` trait is a customizable trait that can be provided to `Boa`
+/// for customizing output.
+pub trait Tracer {
+    /// The output from tracing a `CodeBlock`'s bytecode.
+    fn emit_bytecode_trace(&self, msg: &str);
+    /// The output from entering a `CallFrame`.
+    fn emit_call_frame_entrance_trace(&self, msg: &str);
+    /// The trace output from an execution.
+    fn emit_instruction_trace(&self, msg: &str);
+    /// Trace output from exiting a `CallFrame`.
+    fn emit_call_frame_exit_trace(&self, msg: &str);
+}
+
+#[derive(Debug)]
+pub(crate) struct DefaultTracer;
+
+impl Tracer for DefaultTracer {
+    fn emit_bytecode_trace(&self, msg: &str) {
+        println!("{msg}");
+    }
+
+    fn emit_call_frame_entrance_trace(&self, msg: &str) {
+        println!("{msg}");
+    }
+
+    fn emit_instruction_trace(&self, msg: &str) {
+        println!("{msg}");
+    }
+
+    fn emit_call_frame_exit_trace(&self, msg: &str) {
+        println!("{msg}");
+    }
+}
+
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub(crate) struct TraceOptions: u8 {
@@ -28,15 +63,11 @@ impl Vm {
 impl Default for VmTrace {
     fn default() -> Self {
         Self {
-            compiled_action: None,
-            trace_action: None,
             options: Cell::new(TraceOptions::FULL_TRACE),
+            tracer: Box::new(DefaultTracer),
         }
     }
 }
-
-// Action function provided by the user.
-type ActionFunction = Box<dyn Fn(&str)>;
 
 /// `VmTrace` is a boa spcific structure for running Boa's Virtual Machine trace.
 ///
@@ -52,9 +83,8 @@ type ActionFunction = Box<dyn Fn(&str)>;
 /// After the Global callframe is initially provided. It searches
 /// for all possible compiled output
 pub struct VmTrace {
-    compiled_action: Option<ActionFunction>,
-    trace_action: Option<ActionFunction>,
     options: Cell<TraceOptions>,
+    tracer: Box<dyn Tracer>,
 }
 
 // ==== Public API ====
@@ -64,34 +94,21 @@ impl VmTrace {
     /// Create a partial `VmTrace`.
     pub fn partial() -> Self {
         Self {
-            compiled_action: None,
-            trace_action: None,
             options: Cell::new(TraceOptions::empty()),
+            tracer: Box::new(DefaultTracer),
         }
     }
 
     #[must_use]
     /// Method for adding a compiled action on initialization.
-    pub fn with_compiled_action(mut self, f: ActionFunction) -> Self {
-        self.set_compiled_action(f);
+    pub fn with_tracer(mut self, tracer: Box<dyn Tracer>) -> Self {
+        self.set_tracer(tracer);
         self
     }
 
-    #[must_use]
-    /// Method for adding a trace action on initialization.
-    pub fn with_trace_action(mut self, f: ActionFunction) -> Self {
-        self.set_trace_action(f);
-        self
-    }
-
-    /// Sets the `compiled_action` of `VmTrace` to a custom user-defined action.
-    pub fn set_compiled_action(&mut self, f: ActionFunction) {
-        self.compiled_action = Some(f);
-    }
-
-    /// Sets the `trace_action` of `VmTrace` to a custom user-defined action.
-    pub fn set_trace_action(&mut self, f: ActionFunction) {
-        self.trace_action = Some(f);
+    /// Sets the current `Tracer` of `VmTrace`.
+    pub fn set_tracer(&mut self, tracer: Box<dyn Tracer>) {
+        self.tracer = tracer;
     }
 }
 
@@ -133,7 +150,8 @@ impl VmTrace {
     }
 }
 
-// ---- Trace Event/Action Methods ----
+// ==== Trace Event/Action Methods ====
+
 impl VmTrace {
     const COLUMN_WIDTH: usize = 26;
     const TIME_COLUMN_WIDTH: usize = Self::COLUMN_WIDTH / 2;
@@ -141,24 +159,6 @@ impl VmTrace {
     const OPERAND_COLUMN_WIDTH: usize = Self::COLUMN_WIDTH;
     const NUMBER_OF_COLUMNS: usize = 4;
 
-    pub(crate) fn trigger_compiled_output_action(&self, msg: &str) {
-        if let Some(action) = &self.compiled_action {
-            action(&format!("{msg}\n"));
-        } else {
-            println!("{msg}");
-        }
-    }
-
-    pub(crate) fn trigger_trace_action(&self, msg: &str) {
-        if let Some(action) = &self.trace_action {
-            action(&format!("{msg}\n"));
-        } else {
-            println!("{msg}");
-        }
-    }
-}
-
-impl VmTrace {
     /// Trace the current `CallFrame` according to current state
     pub(crate) fn trace_call_frame(&self, vm: &Vm, interner: &Interner) {
         if self.is_full_trace() {
@@ -187,7 +187,7 @@ impl VmTrace {
             "{msg:-^width$}",
             width = Self::COLUMN_WIDTH * Self::NUMBER_OF_COLUMNS - 10
         );
-        self.trigger_trace_action(&frame_header);
+        self.tracer.emit_call_frame_entrance_trace(&frame_header);
 
         if vm.frames.len() == 1 {
             let column_headers = format!(
@@ -200,7 +200,7 @@ impl VmTrace {
                 OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
             );
 
-            self.trigger_trace_action(&column_headers);
+            self.tracer.emit_call_frame_entrance_trace(&column_headers);
         }
     }
 
@@ -216,26 +216,31 @@ impl VmTrace {
 
                 queue.extend(block.functions.iter().cloned());
 
-                self.trigger_compiled_output_action(&block.to_interned_string(interner));
+                self.tracer
+                    .emit_bytecode_trace(&block.to_interned_string(interner));
             }
         }
     }
 
     /// Searches and traces for only current frame's `CodeBlock`.
     pub(crate) fn trace_current_bytecode(&self, vm: &Vm, interner: &Interner) {
-        self.trigger_compiled_output_action(&vm.frame().code_block().to_interned_string(interner));
+        self.tracer
+            .emit_bytecode_trace(&vm.frame().code_block().to_interned_string(interner));
     }
 
     /// Emits an exit message for the current `CallFrame`.
     pub(crate) fn trace_frame_end(&self, vm: &Vm, return_msg: &str) {
         if self.should_trace() {
-            let msg = format!(" Call Frame -- <Exiting {} via {return_msg}> ", vm.frame().code_block().name.to_std_string_escaped());
+            let msg = format!(
+                " Call Frame -- <Exiting {} via {return_msg}> ",
+                vm.frame().code_block().name.to_std_string_escaped()
+            );
             let frame_footer = format!(
                 "{msg:-^width$}",
                 width = Self::COLUMN_WIDTH * Self::NUMBER_OF_COLUMNS - 10
             );
 
-            self.trigger_trace_action(&frame_footer);
+            self.tracer.emit_call_frame_exit_trace(&frame_footer);
         }
 
         self.inactivate();
@@ -253,7 +258,7 @@ impl VmTrace {
             OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
         );
 
-        self.trigger_trace_action(&instruction_trace);
+        self.tracer.emit_instruction_trace(&instruction_trace);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -273,27 +278,12 @@ impl VmTrace {
             OPERAND_COLUMN_WIDTH = Self::OPERAND_COLUMN_WIDTH,
         );
 
-        self.trigger_trace_action(&instruction_trace);
+        self.tracer.emit_instruction_trace(&instruction_trace);
     }
 }
 
 impl fmt::Debug for VmTrace {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let compiled_action_val = if self.compiled_action.is_none() {
-            "None"
-        } else {
-            "User Defined Fn"
-        };
-
-        let trace_action_val = if self.trace_action.is_none() {
-            "None"
-        } else {
-            "User Defined Fn"
-        };
-
-        f.debug_struct("VmTrace")
-            .field("Compiled Action", &compiled_action_val)
-            .field("Runtime Trace Action", &trace_action_val)
-            .finish()
+        write!(f, "Current Active Tracer")
     }
 }
