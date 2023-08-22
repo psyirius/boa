@@ -158,12 +158,21 @@ enum Cli {
         verbose: u8,
 
         /// Path to the Test262 suite.
-        #[arg(long, value_hint = ValueHint::DirPath)]
+        #[arg(
+            long,
+            value_hint = ValueHint::DirPath,
+            conflicts_with = "test262_update",
+            conflicts_with = "test262_commit"
+        )]
         test262_path: Option<PathBuf>,
 
         /// Specify the Test262 commit when cloning the repository.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "test262_update")]
         test262_commit: Option<String>,
+
+        /// Update Test262 commit of the repository.
+        #[arg(long)]
+        test262_update: bool,
 
         /// Which specific test or test suite to run. Should be a path relative to the Test262 directory: e.g. "test/language/types/number"
         #[arg(short, long, default_value = "test", value_hint = ValueHint::AnyPath)]
@@ -219,6 +228,7 @@ fn main() -> Result<()> {
             verbose,
             test262_path,
             test262_commit,
+            test262_update,
             suite,
             output,
             optimize,
@@ -230,7 +240,7 @@ fn main() -> Result<()> {
             let test262_path = if let Some(path) = test262_path.as_deref() {
                 path
             } else {
-                clone_test262(test262_commit.as_deref(), verbose)?;
+                clone_test262(test262_update, test262_commit.as_deref(), verbose)?;
 
                 Path::new(DEFAULT_TEST262_DIRECTORY)
             };
@@ -259,7 +269,8 @@ fn main() -> Result<()> {
     }
 }
 
-fn get_commit_hash(branch: &str) -> Result<(String, String)> {
+/// Returns the commit hash and commit message of the provided branch name.
+fn get_last_branch_commit(branch: &str) -> Result<(String, String)> {
     let result = Command::new("git")
         .arg("log")
         .args(["-n", "1"])
@@ -284,7 +295,29 @@ fn get_commit_hash(branch: &str) -> Result<(String, String)> {
     Ok((hash.into(), message.into()))
 }
 
-fn clone_test262(commit: Option<&str>, verbose: u8) -> Result<()> {
+fn reset_test262_commit(commit: &str, verbose: u8) -> Result<()> {
+    if verbose != 0 {
+        println!("Reset test262 to commit: {commit}...");
+    }
+
+    let result = Command::new("git")
+        .arg("reset")
+        .arg("--hard")
+        .arg(commit)
+        .current_dir(DEFAULT_TEST262_DIRECTORY)
+        .status()?;
+
+    if !result.success() {
+        bail!(
+            "test262 commit {commit} checkout failed with return code: {:?}",
+            result.code()
+        );
+    }
+
+    Ok(())
+}
+
+fn clone_test262(update: bool, commit: Option<&str>, verbose: u8) -> Result<()> {
     const TEST262_REPOSITORY: &str = "https://github.com/tc39/test262";
 
     if Path::new(DEFAULT_TEST262_DIRECTORY).is_dir() {
@@ -298,21 +331,39 @@ fn clone_test262(commit: Option<&str>, verbose: u8) -> Result<()> {
 
         if !result.success() {
             bail!(
-                "test262 fetching latest failed with return code {:?}",
+                "Test262 fetching latest failed with return code {:?}",
                 result.code()
             );
         }
 
-        if verbose != 0 {
-            println!("Checking latest test262 with current HEAD...");
+        let (current_commit_hash, current_commit_message) = get_last_branch_commit("HEAD")?;
+
+        if let Some(commit) = commit {
+            if current_commit_hash != commit {
+                println!("Test262 switching to commit {commit}...");
+                reset_test262_commit(commit, verbose)?;
+            }
+            return Ok(());
         }
-        let (current_commit_hash, current_commit_message) = get_commit_hash("HEAD")?;
-        let (latest_commit_hash, latest_commit_message) = get_commit_hash("origin/main")?;
+
+        if verbose != 0 {
+            println!("Checking latest Test262 with current HEAD...");
+        }
+        let (latest_commit_hash, latest_commit_message) = get_last_branch_commit("origin/main")?;
 
         if current_commit_hash != latest_commit_hash {
-            println!("Warning:");
-            println!("    Current commit HEAD: {current_commit_hash} {current_commit_message}");
-            println!("    Latest commit:       {latest_commit_hash} {latest_commit_message}");
+            if update {
+                println!("Updating Test262 repository:");
+            } else {
+                println!("Warning Test262 repository is not in sync, use '--test262-update' to automatically update it:");
+            }
+
+            println!("    Current commit: {current_commit_hash} {current_commit_message}");
+            println!("    Latest commit:  {latest_commit_hash} {latest_commit_message}");
+
+            if update {
+                reset_test262_commit(&latest_commit_hash, verbose)?;
+            }
         }
 
         return Ok(());
@@ -327,26 +378,17 @@ fn clone_test262(commit: Option<&str>, verbose: u8) -> Result<()> {
 
     if !result.success() {
         bail!(
-            "test262 cloning failed with return code {:?}",
+            "Cloning Test262 repository failed with return code {:?}",
             result.code()
         );
     }
 
     if let Some(commit) = commit {
-        println!("Reset test262 to commit: {commit}...");
-        let result = Command::new("git")
-            .arg("reset")
-            .arg("--hard")
-            .arg(commit)
-            .current_dir(DEFAULT_TEST262_DIRECTORY)
-            .status()?;
-
-        if !result.success() {
-            bail!(
-                "test262 commit {commit} checkout failed with return code: {:?}",
-                result.code()
-            );
+        if verbose != 0 {
+            println!("Reset Test262 to commit: {commit}...");
         }
+
+        reset_test262_commit(commit, verbose)?;
     }
 
     Ok(())
