@@ -11,6 +11,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  TEST262_COMMIT: c30aff08af165f3fbdc1de7653aaac97aede693a
+
 jobs:
   run_test262:
     name: Run the test262 test suite
@@ -48,7 +51,7 @@ jobs:
         run: |
           cd boa
           mkdir ../results
-          cargo run --release --bin boa_tester -- run -v -o ../results/test262
+          cargo run --release --bin boa_tester -- run -v -o ../results/test262 --test262-commit $TEST262_COMMIT
           cd ..
 
       # Run the results comparison

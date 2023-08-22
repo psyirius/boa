@@ -305,7 +305,7 @@ fn clone_test262(commit: Option<&str>) -> Result<()> {
 fn run_test_suite(
     verbose: u8,
     parallel: bool,
-    test262: &Path,
+    test262_path: &Path,
     suite: &Path,
     output: Option<&Path>,
     ignore: &Path,
@@ -334,10 +334,10 @@ fn run_test_suite(
     if verbose != 0 {
         println!("Loading the test suite...");
     }
-    let harness = read_harness(test262).wrap_err("could not read harness")?;
+    let harness = read_harness(test262_path).wrap_err("could not read harness")?;
 
     if suite.to_string_lossy().ends_with(".js") {
-        let test = read_test(&test262.join(suite)).wrap_err_with(|| {
+        let test = read_test(&test262_path.join(suite)).wrap_err_with(|| {
             let suite = suite.display();
             format!("could not read the test {suite}")
         })?;
@@ -355,7 +355,7 @@ fn run_test_suite(
 
         println!();
     } else {
-        let suite = read_suite(&test262.join(suite), &ignored, false).wrap_err_with(|| {
+        let suite = read_suite(&test262_path.join(suite), &ignored, false).wrap_err_with(|| {
             let suite = suite.display();
             format!("could not read the suite {suite}")
         })?;
@@ -425,7 +425,7 @@ fn run_test_suite(
         }
 
         if let Some(output) = output {
-            write_json(results, output, verbose)
+            write_json(results, output, verbose, test262_path)
                 .wrap_err("could not write the results to the output JSON file")?;
         }
     }
