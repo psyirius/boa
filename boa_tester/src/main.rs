@@ -230,7 +230,7 @@ fn main() -> Result<()> {
             let test262_path = if let Some(path) = test262_path.as_deref() {
                 path
             } else {
-                clone_test262(test262_commit.as_deref())?;
+                clone_test262(test262_commit.as_deref(), verbose)?;
 
                 Path::new(DEFAULT_TEST262_DIRECTORY)
             };
@@ -259,10 +259,62 @@ fn main() -> Result<()> {
     }
 }
 
-fn clone_test262(commit: Option<&str>) -> Result<()> {
+fn get_commit_hash(branch: &str) -> Result<(String, String)> {
+    let result = Command::new("git")
+        .arg("log")
+        .args(["-n", "1"])
+        .arg("--pretty=format:%H %s")
+        .arg(branch)
+        .current_dir(DEFAULT_TEST262_DIRECTORY)
+        .output()?;
+
+    if !result.status.success() {
+        bail!(
+            "test262 getting commit hash and message failed with return code {:?}",
+            result.status.code()
+        );
+    }
+
+    let output = std::str::from_utf8(&result.stdout)?.trim();
+
+    let (hash, message) = output
+        .split_once(' ')
+        .expect("git log output to contain hash and message");
+
+    Ok((hash.into(), message.into()))
+}
+
+fn clone_test262(commit: Option<&str>, verbose: u8) -> Result<()> {
     const TEST262_REPOSITORY: &str = "https://github.com/tc39/test262";
 
     if Path::new(DEFAULT_TEST262_DIRECTORY).is_dir() {
+        if verbose != 0 {
+            println!("Fetching latest test262 commits...");
+        }
+        let result = Command::new("git")
+            .arg("fetch")
+            .current_dir(DEFAULT_TEST262_DIRECTORY)
+            .status()?;
+
+        if !result.success() {
+            bail!(
+                "test262 fetching latest failed with return code {:?}",
+                result.code()
+            );
+        }
+
+        if verbose != 0 {
+            println!("Checking latest test262 with current HEAD...");
+        }
+        let (current_commit_hash, current_commit_message) = get_commit_hash("HEAD")?;
+        let (latest_commit_hash, latest_commit_message) = get_commit_hash("origin/main")?;
+
+        if current_commit_hash != latest_commit_hash {
+            println!("Warning:");
+            println!("    Current commit HEAD: {current_commit_hash} {current_commit_message}");
+            println!("    Latest commit:       {latest_commit_hash} {latest_commit_message}");
+        }
+
         return Ok(());
     }
 
