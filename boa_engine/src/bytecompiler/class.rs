@@ -382,7 +382,7 @@ impl ByteCompiler<'_, '_> {
                         &[Operand::U32(index), Operand::Bool(false)],
                     );
                     self.emit_opcode(Opcode::SetHomeObjectClass);
-                    self.emit(Opcode::Call, &[Operand::U32(0)]);
+                    self.emit_varying_width(Opcode::Call, 0);
                     if let Some(name_index) = name_index {
                         self.emit_varying_width(Opcode::DefineOwnPropertyByName, name_index);
                     } else {
@@ -432,7 +432,7 @@ impl ByteCompiler<'_, '_> {
                         &[Operand::U32(index), Operand::Bool(false)],
                     );
                     self.emit_opcode(Opcode::SetHomeObjectClass);
-                    self.emit(Opcode::Call, &[Operand::U32(0)]);
+                    self.emit_varying_width(Opcode::Call, 0);
                     self.emit_opcode(Opcode::Pop);
                 }
                 // TODO: set names for private methods

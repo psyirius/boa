@@ -1054,7 +1054,7 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
                     for arg in args {
                         self.compile_expr(arg, true);
                     }
-                    self.emit(Opcode::Call, &[Operand::U32(args.len() as u32)]);
+                    self.emit_varying_width(Opcode::Call, args.len() as u32);
                 }
 
                 self.emit_opcode(Opcode::PushUndefined);
@@ -1250,9 +1250,9 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         let index = self.function(function);
 
         if r#async && generator {
-            self.emit(Opcode::GetGeneratorAsync, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGeneratorAsync, index);
         } else if generator {
-            self.emit(Opcode::GetGenerator, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
             self.emit(
                 Opcode::GetAsyncArrowFunction,
@@ -1333,9 +1333,9 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         self.functions.push(code);
 
         if r#async && generator {
-            self.emit(Opcode::GetGeneratorAsync, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGeneratorAsync, index);
         } else if generator {
-            self.emit(Opcode::GetGenerator, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
             self.emit(
                 Opcode::GetAsyncArrowFunction,
@@ -1403,9 +1403,9 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         self.functions.push(code);
 
         if r#async && generator {
-            self.emit(Opcode::GetGeneratorAsync, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGeneratorAsync, index);
         } else if generator {
-            self.emit(Opcode::GetGenerator, &[Operand::U32(index)]);
+            self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
             self.emit(
                 Opcode::GetAsyncArrowFunction,
@@ -1490,12 +1490,12 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         match kind {
             CallKind::CallEval if contains_spread => self.emit_opcode(Opcode::CallEvalSpread),
             CallKind::CallEval => {
-                self.emit(Opcode::CallEval, &[Operand::U32(call.args().len() as u32)]);
+                self.emit_varying_width(Opcode::CallEval, call.args().len() as u32);
             }
             CallKind::Call if contains_spread => self.emit_opcode(Opcode::CallSpread),
-            CallKind::Call => self.emit(Opcode::Call, &[Operand::U32(call.args().len() as u32)]),
+            CallKind::Call => self.emit_varying_width(Opcode::Call, call.args().len() as u32),
             CallKind::New if contains_spread => self.emit_opcode(Opcode::NewSpread),
-            CallKind::New => self.emit(Opcode::New, &[Operand::U32(call.args().len() as u32)]),
+            CallKind::New => self.emit_varying_width(Opcode::New, call.args().len() as u32),
         }
 
         if !use_expr {

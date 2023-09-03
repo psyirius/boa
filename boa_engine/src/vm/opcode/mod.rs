@@ -1568,7 +1568,7 @@ generate_opcodes! {
     /// Operands: argument_count: `u32`
     ///
     /// Stack: super_constructor, new_target, argument_1, ... argument_n **=>**
-    SuperCall { argument_count: u32 },
+    SuperCall { argument_count: VaryingOperand },
 
     /// Execute the `super()` method where the arguments contain spreads.
     ///
@@ -1639,21 +1639,21 @@ generate_opcodes! {
     /// Operands: index: `u32`,
     ///
     /// Stack: **=>** func
-    GetGenerator { index: u32 },
+    GetGenerator { index: VaryingOperand },
 
     /// Get async generator function from the pre-compiled inner functions.
     ///
     /// Operands: index: `u32`,
     ///
     /// Stack: **=>** func
-    GetGeneratorAsync { index: u32 },
+    GetGeneratorAsync { index: VaryingOperand },
 
     /// Call a function named "eval".
     ///
     /// Operands: argument_count: `u32`
     ///
     /// Stack: this, func, argument_1, ... argument_n **=>** result
-    CallEval { argument_count: u32 },
+    CallEval { argument_count: VaryingOperand },
 
     /// Call a function named "eval" where the arguments contain spreads.
     ///
@@ -1667,7 +1667,7 @@ generate_opcodes! {
     /// Operands: argument_count: `u32`
     ///
     /// Stack: this, func, argument_1, ... argument_n **=>** result
-    Call { argument_count: u32 },
+    Call { argument_count: VaryingOperand },
 
     /// Call a function where the arguments contain spreads.
     ///
@@ -1681,7 +1681,7 @@ generate_opcodes! {
     /// Operands: argument_count: `u32`
     ///
     /// Stack: func, argument_1, ... argument_n **=>** result
-    New { argument_count: u32 },
+    New { argument_count: VaryingOperand },
 
     /// Call construct on a function where the arguments contain spreads.
     ///
@@ -1885,7 +1885,7 @@ generate_opcodes! {
     /// Operands: value_count: `u32`
     ///
     /// Stack: `value_1`,...`value_n` **=>** `string`
-    ConcatToString { value_count: u32 },
+    ConcatToString { value_count: VaryingOperand },
 
     /// Call RequireObjectCoercible on the stack value.
     ///

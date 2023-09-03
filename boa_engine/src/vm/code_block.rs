@@ -334,8 +334,8 @@ impl CodeBlock {
             | Instruction::Default { address: value }
             | Instruction::LogicalAnd { exit: value }
             | Instruction::LogicalOr { exit: value }
-            | Instruction::Coalesce { exit: value }
-            | Instruction::CallEval {
+            | Instruction::Coalesce { exit: value } => value.to_string(),
+            Instruction::CallEval {
                 argument_count: value,
             }
             | Instruction::Call {
@@ -347,7 +347,7 @@ impl CodeBlock {
             | Instruction::SuperCall {
                 argument_count: value,
             }
-            | Instruction::ConcatToString { value_count: value } => value.to_string(),
+            | Instruction::ConcatToString { value_count: value } => value.value().to_string(),
             Instruction::PushDeclarativeEnvironment {
                 compile_environments_index,
             }
@@ -385,12 +385,11 @@ impl CodeBlock {
                 )
             }
             Instruction::GetGenerator { index } | Instruction::GetGeneratorAsync { index } => {
+                let index = index.value() as usize;
                 format!(
                     "{index:04}: '{}' (length: {})",
-                    self.functions[*index as usize]
-                        .name()
-                        .to_std_string_escaped(),
-                    self.functions[*index as usize].length
+                    self.functions[index].name().to_std_string_escaped(),
+                    self.functions[index].length
                 )
             }
             Instruction::DefVar { index }

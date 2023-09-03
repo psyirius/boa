@@ -719,9 +719,9 @@ impl ByteCompiler<'_, '_> {
                 let index = self.functions.len() as u32;
                 self.functions.push(code);
                 if r#async && generator {
-                    self.emit(Opcode::GetGeneratorAsync, &[Operand::U32(index)]);
+                    self.emit_varying_width(Opcode::GetGeneratorAsync, index);
                 } else if generator {
-                    self.emit(Opcode::GetGenerator, &[Operand::U32(index)]);
+                    self.emit_varying_width(Opcode::GetGenerator, index);
                 } else if r#async {
                     self.emit(
                         Opcode::GetFunctionAsync,

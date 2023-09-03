@@ -66,9 +66,9 @@ impl ByteCompiler<'_, '_> {
             }
         }
 
-        self.emit(
+        self.emit_varying_width(
             Opcode::ConcatToString,
-            &[Operand::U32(template_literal.elements().len() as u32)],
+            template_literal.elements().len() as u32,
         );
 
         if !use_expr {
@@ -277,10 +277,7 @@ impl ByteCompiler<'_, '_> {
                     self.compile_expr(expr, true);
                 }
 
-                self.emit(
-                    Opcode::Call,
-                    &[Operand::U32(template.exprs().len() as u32 + 1)],
-                );
+                self.emit_varying_width(Opcode::Call, template.exprs().len() as u32 + 1);
             }
             Expression::Class(class) => self.class(class, true),
             Expression::SuperCall(super_call) => {
@@ -311,10 +308,7 @@ impl ByteCompiler<'_, '_> {
                 if contains_spread {
                     self.emit_opcode(Opcode::SuperCallSpread);
                 } else {
-                    self.emit(
-                        Opcode::SuperCall,
-                        &[Operand::U32(super_call.arguments().len() as u32)],
-                    );
+                    self.emit_varying_width(Opcode::SuperCall, super_call.arguments().len() as u32);
                 }
 
                 if !use_expr {
