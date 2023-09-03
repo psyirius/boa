@@ -1501,7 +1501,7 @@ impl SourceTextModule {
                         let binding = compiler.initialize_mutable_binding(name, false);
                         let index = compiler.get_or_insert_binding(binding);
                         compiler.emit_opcode(Opcode::PushUndefined);
-                        compiler.emit_wide(Opcode::DefInitVar, index);
+                        compiler.emit_varying_width(Opcode::DefInitVar, index);
                         // 3. Append dn to declaredVarNames.
                         declared_var_names.push(name);
                     }

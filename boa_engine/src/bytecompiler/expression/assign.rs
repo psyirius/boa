@@ -60,9 +60,9 @@ impl ByteCompiler<'_, '_> {
                     let lex = self.current_environment.is_lex_binding(name);
 
                     if lex {
-                        self.emit_wide(Opcode::GetName, index);
+                        self.emit_varying_width(Opcode::GetName, index);
                     } else {
-                        self.emit_wide(Opcode::GetNameAndLocator, index);
+                        self.emit_varying_width(Opcode::GetNameAndLocator, index);
                     }
 
                     if short_circuit {
@@ -79,11 +79,11 @@ impl ByteCompiler<'_, '_> {
                         match self.set_mutable_binding(name) {
                             Ok(binding) => {
                                 let index = self.get_or_insert_binding(binding);
-                                self.emit_wide(Opcode::SetName, index);
+                                self.emit_varying_width(Opcode::SetName, index);
                             }
                             Err(BindingLocatorError::MutateImmutable) => {
                                 let index = self.get_or_insert_name(name);
-                                self.emit_wide(Opcode::ThrowMutateImmutable, index);
+                                self.emit_varying_width(Opcode::ThrowMutateImmutable, index);
                             }
                             Err(BindingLocatorError::Silent) => {
                                 self.emit_opcode(Opcode::Pop);
@@ -102,7 +102,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(Opcode::Dup);
                             self.emit_opcode(Opcode::Dup);
 
-                            self.emit_wide(Opcode::GetPropertyByName, index);
+                            self.emit_varying_width(Opcode::GetPropertyByName, index);
                             if short_circuit {
                                 pop_count = 2;
                                 early_exit = Some(self.emit_opcode_with_operand(opcode));
@@ -112,7 +112,7 @@ impl ByteCompiler<'_, '_> {
                                 self.emit_opcode(opcode);
                             }
 
-                            self.emit_wide(Opcode::SetPropertyByName, index);
+                            self.emit_varying_width(Opcode::SetPropertyByName, index);
                             if !use_expr {
                                 self.emit_opcode(Opcode::Pop);
                             }
@@ -145,7 +145,7 @@ impl ByteCompiler<'_, '_> {
                         self.compile_expr(access.target(), true);
                         self.emit_opcode(Opcode::Dup);
 
-                        self.emit_wide(Opcode::GetPrivateField, index);
+                        self.emit_varying_width(Opcode::GetPrivateField, index);
                         if short_circuit {
                             pop_count = 1;
                             early_exit = Some(self.emit_opcode_with_operand(opcode));
@@ -155,7 +155,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(opcode);
                         }
 
-                        self.emit_wide(Opcode::SetPrivateField, index);
+                        self.emit_varying_width(Opcode::SetPrivateField, index);
                         if !use_expr {
                             self.emit_opcode(Opcode::Pop);
                         }
@@ -169,7 +169,7 @@ impl ByteCompiler<'_, '_> {
                             self.emit_opcode(Opcode::Swap);
                             self.emit_opcode(Opcode::This);
 
-                            self.emit_wide(Opcode::GetPropertyByName, index);
+                            self.emit_varying_width(Opcode::GetPropertyByName, index);
                             if short_circuit {
                                 pop_count = 2;
                                 early_exit = Some(self.emit_opcode_with_operand(opcode));
@@ -179,7 +179,7 @@ impl ByteCompiler<'_, '_> {
                                 self.emit_opcode(opcode);
                             }
 
-                            self.emit_wide(Opcode::SetPropertyByName, index);
+                            self.emit_varying_width(Opcode::SetPropertyByName, index);
                             if !use_expr {
                                 self.emit_opcode(Opcode::Pop);
                             }

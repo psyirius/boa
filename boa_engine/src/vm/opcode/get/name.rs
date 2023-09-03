@@ -37,6 +37,11 @@ impl Operation for GetName {
         Self::operation(context, index as usize)
     }
 
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
+    }
+
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
         Self::operation(context, index as usize)
@@ -68,6 +73,11 @@ impl Operation for GetLocator {
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u8>();
         Self::operation(context, index as usize)
+    }
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
     }
 
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
@@ -109,6 +119,11 @@ impl Operation for GetNameAndLocator {
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u8>();
         Self::operation(context, index as usize)
+    }
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
     }
 
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
@@ -158,6 +173,11 @@ impl Operation for GetNameOrUndefined {
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u8>();
         Self::operation(context, index as usize)
+    }
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
     }
 
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {

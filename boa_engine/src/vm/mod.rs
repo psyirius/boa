@@ -283,6 +283,7 @@ impl Context<'_> {
 
         let varying_operand_kind = match varying_operand_kind {
             VaryingOperandKind::Short => "",
+            VaryingOperandKind::Half => ".Half",
             VaryingOperandKind::Wide => ".Wide",
         };
 

@@ -29,7 +29,7 @@ impl ByteCompiler<'_, '_> {
                     Expression::Identifier(identifier) => {
                         let binding = self.get_binding_value(*identifier);
                         let index = self.get_or_insert_binding(binding);
-                        self.emit_wide(Opcode::GetNameOrUndefined, index);
+                        self.emit_varying_width(Opcode::GetNameOrUndefined, index);
                     }
                     expr => self.compile_expr(expr, true),
                 }

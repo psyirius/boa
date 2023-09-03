@@ -576,7 +576,8 @@ impl CodeBlock {
             | Instruction::SetReturnValue
             | Instruction::Nop => String::new(),
 
-            Instruction::Wide
+            Instruction::Half
+            | Instruction::Wide
             | Instruction::Reserved1
             | Instruction::Reserved2
             | Instruction::Reserved3
@@ -633,8 +634,7 @@ impl CodeBlock {
             | Instruction::Reserved54
             | Instruction::Reserved55
             | Instruction::Reserved56
-            | Instruction::Reserved57
-            | Instruction::Reserved58 => unreachable!("Reserved opcodes are unrechable"),
+            | Instruction::Reserved57 => unreachable!("Reserved opcodes are unrechable"),
         }
     }
 }
@@ -679,6 +679,7 @@ impl ToInternedString for CodeBlock {
 
             let varying_operand_kind = match varying_operand_kind {
                 super::VaryingOperandKind::Short => "",
+                super::VaryingOperandKind::Half => ".Half",
                 super::VaryingOperandKind::Wide => ".Wide",
             };
 

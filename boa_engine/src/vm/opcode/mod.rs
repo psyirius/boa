@@ -130,6 +130,7 @@ where
 pub enum VaryingOperandKind {
     #[default]
     Short,
+    Half,
     Wide,
 }
 
@@ -152,6 +153,13 @@ impl VaryingOperand {
     pub fn short(value: u8) -> Self {
         Self {
             kind: VaryingOperandKind::Short,
+            value: u32::from(value),
+        }
+    }
+    #[must_use]
+    pub fn half(value: u16) -> Self {
+        Self {
+            kind: VaryingOperandKind::Half,
             value: u32::from(value),
         }
     }
@@ -181,12 +189,14 @@ impl BytecodeConversion for VaryingOperand {
     fn to_bytecode(&self, bytes: &mut Vec<u8>) {
         match self.kind() {
             VaryingOperandKind::Short => u8::to_bytecode(&(self.value() as u8), bytes),
+            VaryingOperandKind::Half => u16::to_bytecode(&(self.value() as u16), bytes),
             VaryingOperandKind::Wide => u32::to_bytecode(&self.value(), bytes),
         }
     }
     fn from_bytecode(bytes: &[u8], pc: &mut usize, varying_kind: VaryingOperandKind) -> Self {
         match varying_kind {
             VaryingOperandKind::Short => Self::short(u8::from_bytecode(bytes, pc, varying_kind)),
+            VaryingOperandKind::Half => Self::half(u16::from_bytecode(bytes, pc, varying_kind)),
             VaryingOperandKind::Wide => Self::wide(u32::from_bytecode(bytes, pc, varying_kind)),
         }
     }
@@ -389,9 +399,10 @@ macro_rules! generate_opcodes {
         }
 
         impl Opcode {
-            const MAX: usize = 2usize.pow(8) * 2;
+            const MAX: usize = 2usize.pow(8) * 3;
 
             const NAMES: [&'static str; Self::MAX] = [
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::NAME),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::NAME),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::NAME),*
             ];
@@ -404,6 +415,7 @@ macro_rules! generate_opcodes {
 
             const INSTRUCTIONS: [&'static str; Self::MAX] = [
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::INSTRUCTION),*,
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::INSTRUCTION),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::INSTRUCTION),*
             ];
 
@@ -415,6 +427,7 @@ macro_rules! generate_opcodes {
 
             const EXECUTE_FNS: [fn(&mut Context<'_>) -> JsResult<CompletionType>; Self::MAX] = [
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::execute),*,
+                $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::half_execute),*,
                 $(<generate_opcodes!(name $Variant $(=> $mapping)?)>::wide_execute),*
             ];
 
@@ -513,6 +526,10 @@ pub(crate) trait Operation {
     const INSTRUCTION: &'static str;
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType>;
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        Reserved::half_execute(context)
+    }
 
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         Reserved::wide_execute(context)
@@ -2018,9 +2035,16 @@ generate_opcodes! {
     /// Stack: **=>**
     Nop,
 
+    /// Half modifier
+    ///
+    /// Operands: opcode (and operands if any).
+    ///
+    /// Stack: **=>**
+    Half,
+
     /// Wide modifier
     ///
-    /// Operands: opcode and operands if any.
+    /// Operands: opcode (and operands if any).
     ///
     /// Stack: **=>**
     Wide,
@@ -2139,8 +2163,6 @@ generate_opcodes! {
     Reserved56 => Reserved,
     /// Reserved [`Opcode`].
     Reserved57 => Reserved,
-    /// Reserved [`Opcode`].
-    Reserved58 => Reserved,
 }
 
 /// Specific opcodes for bindings.
@@ -2197,7 +2219,13 @@ impl Iterator for InstructionIterator<'_> {
         let instruction =
             Instruction::from_bytecode(self.bytes, &mut self.pc, VaryingOperandKind::Short);
 
-        if instruction == Instruction::Wide {
+        if instruction == Instruction::Half {
+            return Some((
+                start_pc,
+                VaryingOperandKind::Half,
+                Instruction::from_bytecode(self.bytes, &mut self.pc, VaryingOperandKind::Half),
+            ));
+        } else if instruction == Instruction::Wide {
             return Some((
                 start_pc,
                 VaryingOperandKind::Wide,

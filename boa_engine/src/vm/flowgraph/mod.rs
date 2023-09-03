@@ -469,7 +469,8 @@ impl CodeBlock {
                 Instruction::Return => {
                     graph.add_node(previous_pc, NodeShape::Diamond, label.into(), Color::Red);
                 }
-                Instruction::Wide
+                Instruction::Half
+                | Instruction::Wide
                 | Instruction::Reserved1
                 | Instruction::Reserved2
                 | Instruction::Reserved3
@@ -526,8 +527,7 @@ impl CodeBlock {
                 | Instruction::Reserved54
                 | Instruction::Reserved55
                 | Instruction::Reserved56
-                | Instruction::Reserved57
-                | Instruction::Reserved58 => unreachable!("Reserved opcodes are unrechable"),
+                | Instruction::Reserved57 => unreachable!("Reserved opcodes are unrechable"),
             }
         }
 

@@ -97,7 +97,7 @@ impl ByteCompiler<'_, '_> {
     pub(crate) fn compile_binary_in_private(&mut self, binary: &BinaryInPrivate, use_expr: bool) {
         let index = self.get_or_insert_private_name(*binary.lhs());
         self.compile_expr(binary.rhs(), true);
-        self.emit_wide(Opcode::InPrivate, index);
+        self.emit_varying_width(Opcode::InPrivate, index);
 
         if !use_expr {
             self.emit_opcode(Opcode::Pop);

@@ -60,6 +60,11 @@ impl Operation for DefineClassStaticSetterByName {
         Self::operation(context, index)
     }
 
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
+    }
+
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>() as usize;
         Self::operation(context, index)
@@ -124,6 +129,11 @@ impl Operation for DefineClassSetterByName {
 
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u8>() as usize;
+        Self::operation(context, index)
+    }
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
         Self::operation(context, index)
     }
 

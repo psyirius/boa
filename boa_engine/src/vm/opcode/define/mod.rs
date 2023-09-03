@@ -44,6 +44,11 @@ impl Operation for DefVar {
         Self::operation(context, index as usize)
     }
 
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
+    }
+
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
         Self::operation(context, index as usize)
@@ -83,6 +88,11 @@ impl Operation for DefInitVar {
         Self::operation(context, index as usize)
     }
 
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
+    }
+
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u32>();
         Self::operation(context, index as usize)
@@ -118,6 +128,11 @@ impl Operation for PutLexicalValue {
     fn execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
         let index = context.vm.read::<u8>();
         Self::operation(context, index as usize)
+    }
+
+    fn half_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
+        let index = context.vm.read::<u16>() as usize;
+        Self::operation(context, index)
     }
 
     fn wide_execute(context: &mut Context<'_>) -> JsResult<CompletionType> {
