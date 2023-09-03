@@ -437,6 +437,10 @@ macro_rules! generate_opcodes {
         }
 
         /// This represents a VM instruction, it contains both opcode and operands.
+        ///
+        // TODO: An instruction should be a representation of a valid executable instruction (opcode + operands),
+        //       so variants like `ResevedN`, or operand width prefix modifiers, idealy shouldn't
+        //       be a part of `Instruction`.
         #[derive(Debug, Clone, PartialEq)]
         #[repr(u8)]
         pub enum Instruction {
@@ -2035,18 +2039,18 @@ generate_opcodes! {
     /// Stack: **=>**
     Nop,
 
-    /// Half modifier
+    /// Half [`Opcode`] prefix operand modifier, makes all ([`VaryingOperand`])s of an instruction [`u16`] sized.
     ///
-    /// Operands: opcode (and operands if any).
+    /// Operands: opcode (operands if any).
     ///
-    /// Stack: **=>**
+    /// Stack: The stack changes based on the opcode that is being prefixed.
     Half,
 
-    /// Wide modifier
+    /// Wide [`Opcode`] prefix operand modifier, makes all ([`VaryingOperand`])s of an instruction [`u32`] sized.
     ///
-    /// Operands: opcode (and operands if any).
+    /// Operands: opcode (operands if any).
     ///
-    /// Stack: **=>**
+    /// Stack: The stack changes based on the opcode that is being prefixed.
     Wide,
 
     /// Reserved [`Opcode`].

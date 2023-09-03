@@ -5,7 +5,7 @@ use super::{Opcode, Operation};
 /// `Half` implements the Opcode Operation for `Opcode::Half`
 ///
 /// Operation:
-///  - TODO: doc
+///  - [`Opcode`] prefix operand modifier, makes all varying operands of an instruction [`u16`] sized.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Half;
 
@@ -23,7 +23,7 @@ impl Operation for Half {
 /// `Wide` implements the Opcode Operation for `Opcode::Wide`
 ///
 /// Operation:
-///  - TODO: doc
+///  - TODO: [`Opcode`] prefix operand modifier, makes all varying operands of an instruction [`u16`] sized.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Wide;
 
