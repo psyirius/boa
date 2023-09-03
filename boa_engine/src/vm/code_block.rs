@@ -372,19 +372,19 @@ impl CodeBlock {
             | Instruction::TemplateCreate { count: value, site } => {
                 format!("{value}, {site}")
             }
-            Instruction::GetArrowFunction { index, method }
-            | Instruction::GetAsyncArrowFunction { index, method }
-            | Instruction::GetFunction { index, method }
+            Instruction::GetFunction { index, method }
             | Instruction::GetFunctionAsync { index, method } => {
+                let index = index.value() as usize;
                 format!(
                     "{index:04}: '{}' (length: {}), method: {method}",
-                    self.functions[*index as usize]
-                        .name()
-                        .to_std_string_escaped(),
-                    self.functions[*index as usize].length
+                    self.functions[index].name().to_std_string_escaped(),
+                    self.functions[index].length
                 )
             }
-            Instruction::GetGenerator { index } | Instruction::GetGeneratorAsync { index } => {
+            Instruction::GetArrowFunction { index }
+            | Instruction::GetAsyncArrowFunction { index }
+            | Instruction::GetGenerator { index }
+            | Instruction::GetGeneratorAsync { index } => {
                 let index = index.value() as usize;
                 format!(
                     "{index:04}: '{}' (length: {})",

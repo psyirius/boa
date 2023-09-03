@@ -1608,49 +1608,49 @@ generate_opcodes! {
 
     /// Get arrow function from the pre-compiled inner functions.
     ///
-    /// Operands: address: `u32`, method: `u8`
+    /// Operands: index: `u32`
     ///
     /// Stack: **=>** func
-    GetArrowFunction { index: u32, method: bool },
+    GetArrowFunction { index: VaryingOperand },
 
     /// Get async arrow function from the pre-compiled inner functions.
     ///
-    /// Operands: index: `u32`, method: `u8`
+    /// Operands: index: `VaryingOperand`
     ///
     /// Stack: **=>** func
-    GetAsyncArrowFunction { index: u32, method: bool },
+    GetAsyncArrowFunction { index: VaryingOperand },
 
     /// Get function from the pre-compiled inner functions.
     ///
-    /// Operands: index: `u32`, is_method: `u8`
+    /// Operands: index: `VaryingOperand`, is_method: `u8`
     ///
     /// Stack: **=>** func
-    GetFunction { index: u32, method: bool },
+    GetFunction { index: VaryingOperand, method: bool },
 
     /// Get async function from the pre-compiled inner functions.
     ///
-    /// Operands: index: `u32`, method: `u8`
+    /// Operands: index: `VaryingOperand`, method: `u8`
     ///
     /// Stack: **=>** func
-    GetFunctionAsync { index: u32, method: bool },
+    GetFunctionAsync { index: VaryingOperand, method: bool },
 
     /// Get generator function from the pre-compiled inner functions.
     ///
-    /// Operands: index: `u32`,
+    /// Operands: index: `VaryingOperand`,
     ///
     /// Stack: **=>** func
     GetGenerator { index: VaryingOperand },
 
     /// Get async generator function from the pre-compiled inner functions.
     ///
-    /// Operands: index: `u32`,
+    /// Operands: index: `VaryingOperand`,
     ///
     /// Stack: **=>** func
     GetGeneratorAsync { index: VaryingOperand },
 
     /// Call a function named "eval".
     ///
-    /// Operands: argument_count: `u32`
+    /// Operands: argument_count: `VaryingOperand`
     ///
     /// Stack: this, func, argument_1, ... argument_n **=>** result
     CallEval { argument_count: VaryingOperand },

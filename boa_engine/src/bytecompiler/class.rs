@@ -80,7 +80,7 @@ impl ByteCompiler<'_, '_> {
         self.functions.push(code);
         self.emit(
             Opcode::GetFunction,
-            &[Operand::U32(index), Operand::Bool(false)],
+            &[Operand::Varying(index), Operand::Bool(false)],
         );
 
         let class_env: Option<super::Label> = match class.name() {
@@ -299,7 +299,7 @@ impl ByteCompiler<'_, '_> {
                     self.functions.push(code);
                     self.emit(
                         Opcode::GetFunction,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                     self.emit_opcode(Opcode::PushClassField);
                 }
@@ -334,7 +334,7 @@ impl ByteCompiler<'_, '_> {
                     self.functions.push(code);
                     self.emit(
                         Opcode::GetFunction,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                     self.emit_varying_width(Opcode::PushClassFieldPrivate, name_index);
                 }
@@ -379,7 +379,7 @@ impl ByteCompiler<'_, '_> {
                     self.functions.push(code);
                     self.emit(
                         Opcode::GetFunction,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                     self.emit_opcode(Opcode::SetHomeObjectClass);
                     self.emit_varying_width(Opcode::Call, 0);
@@ -429,7 +429,7 @@ impl ByteCompiler<'_, '_> {
                     self.functions.push(code);
                     self.emit(
                         Opcode::GetFunction,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                     self.emit_opcode(Opcode::SetHomeObjectClass);
                     self.emit_varying_width(Opcode::Call, 0);

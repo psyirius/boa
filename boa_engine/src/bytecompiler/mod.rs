@@ -17,7 +17,10 @@ use crate::{
     builtins::function::ThisMode,
     environments::{BindingLocator, BindingLocatorError, CompileTimeEnvironment},
     js_string,
-    vm::{BindingOpcode, CodeBlock, CodeBlockFlags, GeneratorResumeKind, Handler, Opcode},
+    vm::{
+        BindingOpcode, CodeBlock, CodeBlockFlags, GeneratorResumeKind, Handler, Opcode,
+        VaryingOperandKind,
+    },
     Context, JsBigInt, JsString, JsValue,
 };
 use boa_ast::{
@@ -223,6 +226,7 @@ pub(crate) enum Operand {
     U32(u32),
     I64(i64),
     U64(u64),
+    Varying(u32),
 }
 
 /// The [`ByteCompiler`] is used to compile ECMAScript AST from [`boa_ast`] to bytecode.
@@ -461,9 +465,27 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
     }
 
     pub(crate) fn emit(&mut self, opcode: Opcode, operands: &[Operand]) {
+        let mut varying_kind = VaryingOperandKind::Short;
+        for operand in operands {
+            if let Operand::Varying(operand) = *operand {
+                if u8::try_from(operand).is_ok() {
+                } else if u16::try_from(operand).is_ok() {
+                    varying_kind = VaryingOperandKind::Half;
+                } else {
+                    varying_kind = VaryingOperandKind::Wide;
+                    break;
+                }
+            }
+        }
+
+        match varying_kind {
+            VaryingOperandKind::Short => {}
+            VaryingOperandKind::Half => self.emit_opcode(Opcode::Half),
+            VaryingOperandKind::Wide => self.emit_opcode(Opcode::Wide),
+        }
         self.emit_opcode(opcode);
         for operand in operands {
-            self.emit_operand(*operand);
+            self.emit_operand(*operand, varying_kind);
         }
     }
 
@@ -482,7 +504,7 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         }
     }
 
-    pub(crate) fn emit_operand(&mut self, operand: Operand) {
+    pub(crate) fn emit_operand(&mut self, operand: Operand, varying_kind: VaryingOperandKind) {
         match operand {
             Operand::Bool(v) => self.emit_u8(v.into()),
             Operand::I8(v) => self.emit_i8(v),
@@ -493,6 +515,11 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
             Operand::U32(v) => self.emit_u32(v),
             Operand::I64(v) => self.emit_i64(v),
             Operand::U64(v) => self.emit_u64(v),
+            Operand::Varying(v) => match varying_kind {
+                VaryingOperandKind::Short => self.emit_u8(v as u8),
+                VaryingOperandKind::Half => self.emit_u16(v as u16),
+                VaryingOperandKind::Wide => self.emit_u32(v),
+            },
         }
     }
 
@@ -1254,24 +1281,18 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         } else if generator {
             self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
-            self.emit(
-                Opcode::GetAsyncArrowFunction,
-                &[Operand::U32(index), Operand::Bool(false)],
-            );
+            self.emit(Opcode::GetAsyncArrowFunction, &[Operand::Varying(index)]);
         } else if r#async {
             self.emit(
                 Opcode::GetFunctionAsync,
-                &[Operand::U32(index), Operand::Bool(false)],
+                &[Operand::Varying(index), Operand::Bool(false)],
             );
         } else if arrow {
-            self.emit(
-                Opcode::GetArrowFunction,
-                &[Operand::U32(index), Operand::Bool(false)],
-            );
+            self.emit(Opcode::GetArrowFunction, &[Operand::Varying(index)]);
         } else {
             self.emit(
                 Opcode::GetFunction,
-                &[Operand::U32(index), Operand::Bool(false)],
+                &[Operand::Varying(index), Operand::Bool(false)],
             );
         }
 
@@ -1337,24 +1358,18 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         } else if generator {
             self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
-            self.emit(
-                Opcode::GetAsyncArrowFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
-            );
+            self.emit(Opcode::GetAsyncArrowFunction, &[Operand::Varying(index)]);
         } else if r#async {
             self.emit(
                 Opcode::GetFunctionAsync,
-                &[Operand::U32(index), Operand::Bool(true)],
+                &[Operand::Varying(index), Operand::Bool(true)],
             );
         } else if arrow {
-            self.emit(
-                Opcode::GetArrowFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
-            );
+            self.emit(Opcode::GetArrowFunction, &[Operand::Varying(index)]);
         } else {
             self.emit(
                 Opcode::GetFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
+                &[Operand::Varying(index), Operand::Bool(true)],
             );
         }
     }
@@ -1407,24 +1422,18 @@ impl<'ctx, 'host> ByteCompiler<'ctx, 'host> {
         } else if generator {
             self.emit_varying_width(Opcode::GetGenerator, index);
         } else if r#async && arrow {
-            self.emit(
-                Opcode::GetAsyncArrowFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
-            );
+            self.emit(Opcode::GetAsyncArrowFunction, &[Operand::Varying(index)]);
         } else if r#async {
             self.emit(
                 Opcode::GetFunctionAsync,
-                &[Operand::U32(index), Operand::Bool(true)],
+                &[Operand::Varying(index), Operand::Bool(true)],
             );
         } else if arrow {
-            self.emit(
-                Opcode::GetArrowFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
-            );
+            self.emit(Opcode::GetArrowFunction, &[Operand::Varying(index)]);
         } else {
             self.emit(
                 Opcode::GetFunction,
-                &[Operand::U32(index), Operand::Bool(true)],
+                &[Operand::Varying(index), Operand::Bool(true)],
             );
         }
     }

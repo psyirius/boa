@@ -725,12 +725,12 @@ impl ByteCompiler<'_, '_> {
                 } else if r#async {
                     self.emit(
                         Opcode::GetFunctionAsync,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                 } else {
                     self.emit(
                         Opcode::GetFunction,
-                        &[Operand::U32(index), Operand::Bool(false)],
+                        &[Operand::Varying(index), Operand::Bool(false)],
                     );
                 }
 
