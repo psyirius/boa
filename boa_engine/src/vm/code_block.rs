@@ -357,8 +357,8 @@ impl CodeBlock {
             Instruction::CopyDataProperties {
                 excluded_key_count: value1,
                 excluded_key_count_computed: value2,
-            }
-            | Instruction::GeneratorDelegateNext {
+            } => format!("{}, {}", value1.value(), value2.value()),
+            Instruction::GeneratorDelegateNext {
                 return_method_undefined: value1,
                 throw_method_undefined: value2,
             }

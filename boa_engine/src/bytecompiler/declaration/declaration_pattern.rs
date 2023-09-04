@@ -81,8 +81,8 @@ impl ByteCompiler<'_, '_> {
                             self.emit(
                                 Opcode::CopyDataProperties,
                                 &[
-                                    Operand::U32(excluded_keys.len() as u32),
-                                    Operand::U32(additional_excluded_keys_count),
+                                    Operand::Varying(excluded_keys.len() as u32),
+                                    Operand::Varying(additional_excluded_keys_count),
                                 ],
                             );
                             self.emit_binding(def, *ident);
@@ -100,7 +100,10 @@ impl ByteCompiler<'_, '_> {
                             }
                             self.emit(
                                 Opcode::CopyDataProperties,
-                                &[Operand::U32(excluded_keys.len() as u32), Operand::U32(0)],
+                                &[
+                                    Operand::Varying(excluded_keys.len() as u32),
+                                    Operand::Varying(0),
+                                ],
                             );
                             self.access_set(
                                 Access::Property { access },

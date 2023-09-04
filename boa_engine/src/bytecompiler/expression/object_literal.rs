@@ -140,7 +140,7 @@ impl ByteCompiler<'_, '_> {
                     self.emit_opcode(Opcode::Swap);
                     self.emit(
                         Opcode::CopyDataProperties,
-                        &[Operand::U32(0), Operand::U32(0)],
+                        &[Operand::Varying(0), Operand::Varying(0)],
                     );
                     self.emit_opcode(Opcode::Pop);
                 }

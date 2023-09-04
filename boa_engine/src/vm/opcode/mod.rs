@@ -1422,10 +1422,10 @@ generate_opcodes! {
 
     /// Copy all properties of one object to another object.
     ///
-    /// Operands: excluded_key_count: `u32`, excluded_key_count_computed: `u32`
+    /// Operands: excluded_key_count: `VaryingOperand`, excluded_key_count_computed: `VaryingOperand`
     ///
     /// Stack: excluded_key_computed_0 ... excluded_key_computed_n, source, value, excluded_key_0 ... excluded_key_n **=>** value
-    CopyDataProperties { excluded_key_count: u32, excluded_key_count_computed: u32 },
+    CopyDataProperties { excluded_key_count: VaryingOperand, excluded_key_count_computed: VaryingOperand },
 
     /// Call ToPropertyKey on the value on the stack.
     ///
