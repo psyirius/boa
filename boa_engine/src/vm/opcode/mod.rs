@@ -2013,10 +2013,10 @@ generate_opcodes! {
 
     /// Create a new tagged template object and cache it.
     ///
-    /// Operands: count: `u32`, site: `u64`
+    /// Operands: count: `VaryingOperand`, site: `u64`
     ///
     /// Stack: count * (cooked_value, raw_value) **=>** template
-    TemplateCreate { count: u32, site: u64 },
+    TemplateCreate { count: VaryingOperand, site: u64 },
 
     /// Push a private environment.
     ///

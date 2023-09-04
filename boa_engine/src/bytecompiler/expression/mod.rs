@@ -268,8 +268,10 @@ impl ByteCompiler<'_, '_> {
                     ));
                 }
 
-                self.emit(Opcode::TemplateCreate, &[Operand::U32(count)]);
-                self.emit_u64(site);
+                self.emit(
+                    Opcode::TemplateCreate,
+                    &[Operand::Varying(count), Operand::U64(site)],
+                );
 
                 self.patch_jump(jump_label);
 

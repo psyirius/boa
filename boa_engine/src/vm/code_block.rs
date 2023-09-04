@@ -368,9 +368,9 @@ impl CodeBlock {
             } => {
                 format!("{value1}, {value2}")
             }
-            Instruction::TemplateLookup { exit: value, site }
-            | Instruction::TemplateCreate { count: value, site } => {
-                format!("{value}, {site}")
+            Instruction::TemplateLookup { exit: value, site } => format!("{value}, {site}"),
+            Instruction::TemplateCreate { count, site } => {
+                format!("{}, {site}", count.value())
             }
             Instruction::GetFunction { index, method }
             | Instruction::GetFunctionAsync { index, method } => {
